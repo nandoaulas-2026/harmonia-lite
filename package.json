@@ -1,0 +1,10 @@
+{
+  "name": "harmonia-lite",
+  "version": "1.0.0",
+  "description": "Harmonia - versao enxuta, uso pessoal.",
+  "private": true,
+  "dependencies": {
+    "@distube/ytdl-core": "^4.14.4",
+    "@google/generative-ai": "^0.21.0"
+  }
+}
