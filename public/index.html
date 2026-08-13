@@ -237,28 +237,33 @@ function libraryHTML(){
         </div>
         <span class="del" data-del="${i}">✕</span>
       </div>`).join("")
-    : `<div class="empty-state">Sua biblioteca está vazia.<br>Toque em "+ Nova música" e cole um link do YouTube.</div>`;
+    : `<div class="empty-state">Sua biblioteca está vazia.<br>Toque em "+ Nova música" e envie um arquivo de áudio.</div>`;
   return `
     <div class="topbar"><h2>🎵 Harmonia</h2><button data-nav="add">+ Nova música</button></div>
     <div class="library">${cards}</div>`;
 }
 
-let addState = "idle", addError = null, linkValue = "";
+let addState = "idle", addError = null, selectedFile = null;
+const MAX_FILE_BYTES = 4 * 1024 * 1024;
+
 function addHTML(){
+  const fileLabel = selectedFile ? `${selectedFile.name} (${(selectedFile.size/1e6).toFixed(1)}MB)` : "Nenhum arquivo escolhido";
   return `
     <div class="topbar"><button class="back-btn" data-nav="library">← Biblioteca</button></div>
     <div class="add-screen">
       <div class="eyebrow">Nova música · IA</div>
-      <h1>Cole o link do YouTube</h1>
-      <p class="sub">A IA ouve o áudio e gera letra, cifra e grade rítmica automaticamente. Pode levar de 30s a alguns minutos, dependendo do tamanho da música.</p>
-      <div class="link-field">
-        <span>🔗</span>
-        <input id="linkInput" type="text" placeholder="https://youtube.com/watch?v=..." value="${escapeHtml(linkValue)}" ${addState==="processing"?"disabled":""}/>
+      <h1>Envie o áudio da música</h1>
+      <p class="sub">Baixe o áudio da música (ex: com um conversor de YouTube pra MP3, em qualidade baixa/média — até uns 4MB) e envie o arquivo aqui. A IA ouve e gera letra, cifra e grade rítmica automaticamente.</p>
+      <div class="link-field" style="cursor:pointer;" onclick="document.getElementById('fileInput').click()">
+        <span>🎵</span>
+        <span style="flex:1; color:${selectedFile?"var(--ink)":"var(--ink-faint)"}; font-size:14px;">${fileLabel}</span>
+        <span style="color:var(--brass); font-family:var(--font-mono); font-size:12px;">Escolher</span>
       </div>
+      <input id="fileInput" type="file" accept="audio/*" style="display:none;" ${addState==="processing"?"disabled":""}/>
       <button class="generate-btn" id="generateBtn" ${addState==="processing"?"disabled":""}>
         ${addState==="processing" ? "Processando..." : "Gerar cifra com IA"}
       </button>
-      ${addState==="processing" ? `<div class="process-note"><div class="spinner"></div> Extraindo áudio e ouvindo a música — isso roda no servidor, pode aguardar.</div>` : ""}
+      ${addState==="processing" ? `<div class="process-note"><div class="spinner"></div> A IA está ouvindo a música — isso roda no servidor, pode aguardar.</div>` : ""}
       ${addError ? `<div class="error-box">${escapeHtml(addError)}</div>` : ""}
     </div>`;
 }
@@ -305,7 +310,7 @@ function songHTML(){
 function bindEvents(){
   document.querySelectorAll("[data-nav]").forEach(el => el.onclick = () => {
     screen = el.dataset.nav;
-    if(screen === "add"){ addState="idle"; addError=null; linkValue=""; }
+    if(screen === "add"){ addState="idle"; addError=null; selectedFile=null; }
     renderApp();
   });
   document.querySelectorAll("[data-open]").forEach(el => el.onclick = () => {
@@ -329,22 +334,46 @@ function bindEvents(){
     transposeAmount = Math.max(-6, Math.min(6, transposeAmount + Number(el.dataset.transpose)));
     renderApp();
   });
-  const input = document.getElementById("linkInput");
-  if(input) input.oninput = (e) => { linkValue = e.target.value; };
+  const fileInput = document.getElementById("fileInput");
+  if(fileInput) fileInput.onchange = (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    if(file.size > MAX_FILE_BYTES){
+      addError = `Esse arquivo tem ${(file.size/1e6).toFixed(1)}MB — o limite é ~4MB. Baixe numa qualidade menor (ex: 64kbps) e tente de novo.`;
+      selectedFile = null;
+    } else {
+      addError = null;
+      selectedFile = file;
+    }
+    renderApp();
+  };
   const genBtn = document.getElementById("generateBtn");
   if(genBtn) genBtn.onclick = generateSong;
 }
 
+function fileToBase64(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result.split(",")[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 async function generateSong(){
-  if(!linkValue.trim()){ addError = "Cole um link do YouTube antes de gerar."; renderApp(); return; }
+  if(!selectedFile){ addError = "Escolha um arquivo de áudio antes de gerar."; renderApp(); return; }
   addState = "processing";
   addError = null;
   renderApp();
   try{
+    const audioBase64 = await fileToBase64(selectedFile);
     const resp = await fetch("/api/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: linkValue.trim() }),
+      body: JSON.stringify({ audioBase64, mimeType: selectedFile.type || "audio/mpeg" }),
     });
     const data = await resp.json();
     if(!resp.ok) throw new Error(data.error || "Erro ao gerar a música.");
@@ -355,6 +384,7 @@ async function generateSong(){
     transposeAmount = 0;
     screen = "song";
     addState = "idle";
+    selectedFile = null;
     renderApp();
   } catch(err){
     addState = "idle";
@@ -366,4 +396,4 @@ async function generateSong(){
 renderApp();
 </script>
 </body>
-  </html>
+</html>
