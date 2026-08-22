@@ -79,6 +79,21 @@
   .staff-wrap{ display:inline-block; background:var(--paper-bg); border-radius:10px; padding:20px 8px 14px; box-shadow:0 8px 24px -8px rgba(0,0,0,.45), inset 0 0 0 1px rgba(0,0,0,.06); transform-origin: top left; }
   .staff-system{ margin-bottom:4px; }
   .staff-legend{ display:flex; flex-wrap:wrap; gap:14px; margin-top:12px; font-family:var(--font-mono); font-size:10px; color:var(--ink-faint); }
+
+  .print-btn{ background:var(--bg-raised) !important; color:var(--sage) !important; border:1px solid var(--hairline) !important; font-size:12px !important; padding:8px 12px !important; }
+
+  @media print{
+    body, #app{ background:#fff !important; }
+    .topbar, .transpose-bar, .format-selector{ display:none !important; }
+    .song-header{ border-bottom:none !important; padding:0 0 10px !important; }
+    .song-header h1{ color:#000 !important; }
+    .screen-body{ padding:10px 0 !important; overflow:visible !important; }
+    .panes-wrap{ display:block !important; }
+    .split-pane{ border:none !important; }
+    .lyric-line, .chunk{ color:#000 !important; }
+    .chunk .chord{ color:#333 !important; }
+    .staff-wrap{ box-shadow:none !important; }
+  }
 </style>
 </head>
 <body>
@@ -284,7 +299,10 @@ function songHTML(){
   const showTranspose = selectedFormats.includes("cifra") || selectedFormats.includes("grade");
 
   return `
-    <div class="topbar"><button class="back-btn" data-nav="library">← Biblioteca</button></div>
+    <div class="topbar">
+      <button class="back-btn" data-nav="library">← Biblioteca</button>
+      <button class="print-btn" data-print="1">⬇ Baixar PDF</button>
+    </div>
     <div class="song-header">
       <h1>${escapeHtml(activeSong.title)}</h1>
       <div class="artist">${escapeHtml(activeSong.artist || "")}</div>
@@ -333,6 +351,12 @@ function bindEvents(){
   document.querySelectorAll("[data-transpose]").forEach(el => el.onclick = () => {
     transposeAmount = Math.max(-6, Math.min(6, transposeAmount + Number(el.dataset.transpose)));
     renderApp();
+  });
+  document.querySelectorAll("[data-print]").forEach(el => el.onclick = () => {
+    const prevTitle = document.title;
+    document.title = (activeSong?.title || "Harmonia") + " - Harmonia";
+    window.print();
+    document.title = prevTitle;
   });
   const fileInput = document.getElementById("fileInput");
   if(fileInput) fileInput.onchange = (e) => {
