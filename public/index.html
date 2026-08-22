@@ -387,6 +387,37 @@ function buildPdfExportHTML(){
   return html;
 }
 
+function inlineSvgAsImages(container){
+  const svgs = Array.from(container.querySelectorAll("svg"));
+  svgs.forEach(svg => {
+    const vb = svg.getAttribute("viewBox");
+    let w = 300, h = 100;
+    if(vb){
+      const parts = vb.split(" ").map(Number);
+      if(parts.length === 4){ w = parts[2]; h = parts[3]; }
+    }
+    const svgString = new XMLSerializer().serializeToString(svg);
+    const svgBase64 = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgString)));
+    const img = document.createElement("img");
+    img.src = svgBase64;
+    img.width = w;
+    img.height = h;
+    img.style.display = "block";
+    img.style.width = "100%";
+    img.style.maxWidth = w + "px";
+    img.style.height = "auto";
+    svg.parentNode.replaceChild(img, svg);
+  });
+}
+
+function waitForImages(container){
+  const imgs = Array.from(container.querySelectorAll("img"));
+  return Promise.all(imgs.map(img => {
+    if(img.complete) return Promise.resolve();
+    return new Promise(resolve => { img.onload = resolve; img.onerror = resolve; });
+  }));
+}
+
 async function downloadPdf(btn){
   if(!activeSong) return;
   const originalLabel = btn ? btn.textContent : null;
@@ -397,8 +428,10 @@ async function downloadPdf(btn){
   wrap.style.cssText = "position:fixed; left:-9999px; top:0; width:700px; background:#fff; padding:28px;";
   wrap.innerHTML = buildPdfExportHTML();
   document.body.appendChild(wrap);
+  inlineSvgAsImages(wrap);
 
   try{
+    await waitForImages(wrap);
     await new Promise(r => setTimeout(r, 80));
     const canvas = await html2canvas(wrap, { scale:2, backgroundColor:"#ffffff", useCORS:true });
     const { jsPDF } = window.jspdf;
