@@ -82,27 +82,11 @@
 
   .print-btn{ background:var(--bg-raised) !important; color:var(--sage) !important; border:1px solid var(--hairline) !important; font-size:12px !important; padding:8px 12px !important; }
   .print-btn:disabled{ opacity:.6; }
-
-  .pdf-export{ font-family: var(--font-body); }
-  .pdf-export .pdf-title{ font-family:var(--font-display); font-size:22px; font-weight:600; margin:0 0 4px; color:#111; }
-  .pdf-export .pdf-artist{ color:#555; font-size:13px; margin:0 0 4px; }
-  .pdf-export .pdf-meta{ font-family:var(--font-mono); font-size:11px; color:#777; margin:0 0 18px; }
-  .pdf-export .pane-title{ font-family:var(--font-mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:#888; margin:22px 0 10px; border-bottom:1px solid #ddd; padding-bottom:6px; }
-  .pdf-export .pane-title:first-of-type{ margin-top:0; }
-  .pdf-export .section-label{ font-family:var(--font-mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:#2F7D74; margin:20px 0 8px; }
-  .pdf-export .section-label:first-child{ margin-top:0; }
-  .pdf-export .lyric-line{ font-size:15px; line-height:1.7; color:#111; }
-  .pdf-export .chord-line{ display:flex; flex-wrap:wrap; margin-bottom:22px; }
-  .pdf-export .chunk{ position:relative; padding-top:20px; font-size:15px; line-height:1.3; white-space:pre; color:#111; }
-  .pdf-export .chunk .chord{ position:absolute; top:0; left:0; font-family:var(--font-mono); font-weight:700; font-size:12px; color:#B5750F; }
-  .pdf-export .staff-scale-outer{ overflow:visible; }
-  .pdf-export .staff-wrap{ box-shadow:none; padding:14px 6px; }
 </style>
 </head>
 <body>
 <div id="app"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 const STORAGE_KEY = "harmonia_songs_v1";
@@ -375,88 +359,178 @@ function bindEvents(){
   if(genBtn) genBtn.onclick = generateSong;
 }
 
-function buildPdfExportHTML(){
-  let html = `
-    <div class="pdf-title">${escapeHtml(activeSong.title)}</div>
-    <div class="pdf-artist">${escapeHtml(activeSong.artist || "")}</div>
-    <div class="pdf-meta">Tom: ${escapeHtml(currentKeyLabel())} · ${activeSong.bpm||"?"} BPM</div>`;
-  selectedFormats.forEach(f => {
-    if(selectedFormats.length > 1) html += `<div class="pane-title">${PANE_LABELS[f]}</div>`;
-    html += PANE_RENDERERS[f]();
-  });
-  return html;
+function ensureSpace(doc, y, need, pageHeight, marginBottom, marginTop){
+  if(y + need > pageHeight - marginBottom){
+    doc.addPage();
+    return marginTop;
+  }
+  return y;
 }
 
-function inlineSvgAsImages(container){
-  const svgs = Array.from(container.querySelectorAll("svg"));
-  svgs.forEach(svg => {
-    const vb = svg.getAttribute("viewBox");
-    let w = 300, h = 100;
-    if(vb){
-      const parts = vb.split(" ").map(Number);
-      if(parts.length === 4){ w = parts[2]; h = parts[3]; }
+function drawLetraPdf(doc, x, y, width, pageHeight, marginBottom, marginTop){
+  const sections = activeSong.lyricSections || [];
+  sections.forEach(sec => {
+    y = ensureSpace(doc, y, 20, pageHeight, marginBottom, marginTop);
+    doc.setFont("courier","bold");
+    doc.setFontSize(9);
+    doc.setTextColor(95,168,160);
+    doc.text(String(sec.label||"").toUpperCase(), x, y);
+    y += 16;
+    (sec.lines || []).forEach(line => {
+      doc.setFont("helvetica","normal");
+      doc.setFontSize(11);
+      doc.setTextColor(20,20,20);
+      const wrapped = doc.splitTextToSize(line || " ", width);
+      wrapped.forEach(wl => {
+        y = ensureSpace(doc, y, 16, pageHeight, marginBottom, marginTop);
+        doc.text(wl, x, y);
+        y += 15;
+      });
+    });
+    y += 8;
+  });
+  return y;
+}
+
+function drawCifraPdf(doc, x0, y, width, pageHeight, marginBottom, marginTop){
+  const lines = activeSong.chordLines || [];
+  const lineHeight = 30;
+  lines.forEach(line => {
+    y = ensureSpace(doc, y, lineHeight+6, pageHeight, marginBottom, marginTop);
+    let x = x0;
+    line.forEach(chunk => {
+      const text = chunk.text || " ";
+      const chordText = transposeChord(chunk.chord, transposeAmount) || "";
+      doc.setFont("helvetica","normal");
+      doc.setFontSize(11);
+      const textWidth = doc.getTextWidth(text);
+      if(x + textWidth > x0 + width){
+        x = x0;
+        y = ensureSpace(doc, y, lineHeight+6, pageHeight, marginBottom, marginTop);
+      }
+      if(chordText){
+        doc.setFont("courier","bold");
+        doc.setFontSize(9);
+        doc.setTextColor(184,120,15);
+        doc.text(chordText, x, y);
+      }
+      doc.setFont("helvetica","normal");
+      doc.setFontSize(11);
+      doc.setTextColor(20,20,20);
+      doc.text(text, x, y+13);
+      x += textWidth;
+    });
+    y += lineHeight;
+  });
+  return y;
+}
+
+function drawGradePdf(doc, x0, y, width, pageHeight, marginBottom, marginTop){
+  const systems = chunkMeasures();
+  if(!systems.length) return y;
+  const MW = width / 4;
+  systems.forEach(sys => {
+    y = ensureSpace(doc, y, 76, pageHeight, marginBottom, marginTop);
+    const top = y + 12, mid = top + 22, bottom = top + 40;
+    doc.setDrawColor(150,150,150);
+    doc.setLineWidth(0.5);
+    for(let i=0;i<5;i++){
+      const ly = top + i*4.5;
+      doc.line(x0, ly, x0+width, ly);
     }
-    const svgString = new XMLSerializer().serializeToString(svg);
-    const svgBase64 = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgString)));
-    const img = document.createElement("img");
-    img.src = svgBase64;
-    img.width = w;
-    img.height = h;
-    img.style.display = "block";
-    img.style.width = "100%";
-    img.style.maxWidth = w + "px";
-    img.style.height = "auto";
-    svg.parentNode.replaceChild(img, svg);
+    sys.items.forEach((m,i) => {
+      const mx = x0 + i*MW;
+      const shownChord = transposeChord(m.chord, transposeAmount) || "";
+      if(m.section){
+        doc.setFont("helvetica","bold");
+        doc.setFontSize(8);
+        doc.setTextColor(30,30,30);
+        const boxW = doc.getTextWidth(m.section)+8;
+        doc.setDrawColor(30,30,30);
+        doc.setLineWidth(0.6);
+        doc.rect(mx+2, top-13, boxW, 11);
+        doc.text(m.section, mx+6, top-5);
+      }
+      doc.setFont("helvetica","bold");
+      doc.setFontSize(11);
+      doc.setTextColor(20,20,20);
+      doc.text(shownChord, mx+4, top+9);
+      doc.setDrawColor(20,20,20);
+      doc.setLineWidth(1.2);
+      for(let b=0;b<4;b++){
+        const bx = mx + 16 + b*((MW-24)/3);
+        doc.line(bx-4, mid+6, bx+4, mid-6);
+      }
+      const xEnd = mx+MW;
+      doc.setLineWidth(m.doubleBarAfter ? 1.6 : 0.7);
+      doc.line(xEnd-2, top, xEnd-2, bottom);
+      if(m.cue){
+        doc.setFont("helvetica","italic");
+        doc.setFontSize(7);
+        doc.setTextColor(120,120,120);
+        doc.text(m.cue, mx+4, bottom+10);
+      }
+    });
+    y = bottom + 18;
   });
-}
-
-function waitForImages(container){
-  const imgs = Array.from(container.querySelectorAll("img"));
-  return Promise.all(imgs.map(img => {
-    if(img.complete) return Promise.resolve();
-    return new Promise(resolve => { img.onload = resolve; img.onerror = resolve; });
-  }));
+  return y;
 }
 
 async function downloadPdf(btn){
   if(!activeSong) return;
   const originalLabel = btn ? btn.textContent : null;
   if(btn){ btn.textContent = "Gerando..."; btn.disabled = true; }
-
-  const wrap = document.createElement("div");
-  wrap.className = "pdf-export";
-  wrap.style.cssText = "position:fixed; left:-9999px; top:0; width:700px; background:#fff; padding:28px;";
-  wrap.innerHTML = buildPdfExportHTML();
-  document.body.appendChild(wrap);
-  inlineSvgAsImages(wrap);
-
   try{
-    await waitForImages(wrap);
-    await new Promise(r => setTimeout(r, 80));
-    const canvas = await html2canvas(wrap, { scale:2, backgroundColor:"#ffffff", useCORS:true });
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF("p","pt","a4");
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const imgWidth = pageWidth;
-    const imgHeight = canvas.height * imgWidth / canvas.width;
-    const imgData = canvas.toDataURL("image/png");
-    let heightLeft = imgHeight, position = 0;
-    pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-    heightLeft -= pageHeight;
-    while(heightLeft > 0){
-      position -= pageHeight;
-      pdf.addPage();
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
+    const doc = new jsPDF("p","pt","a4");
+    const marginX = 42, marginTop = 50, marginBottom = 50;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const contentWidth = pageWidth - marginX*2;
+    let y = marginTop;
+
+    doc.setFont("helvetica","bold");
+    doc.setFontSize(18);
+    doc.setTextColor(20,20,20);
+    doc.text(activeSong.title || "Sem título", marginX, y);
+    y += 22;
+    if(activeSong.artist){
+      doc.setFont("helvetica","normal");
+      doc.setFontSize(11);
+      doc.setTextColor(90,90,90);
+      doc.text(activeSong.artist, marginX, y);
+      y += 16;
     }
+    doc.setFont("courier","normal");
+    doc.setFontSize(9);
+    doc.setTextColor(120,120,120);
+    doc.text(`Tom: ${currentKeyLabel()}  ·  ${activeSong.bpm||"?"} BPM`, marginX, y);
+    y += 26;
+
+    selectedFormats.forEach(f => {
+      if(selectedFormats.length > 1){
+        y = ensureSpace(doc, y, 30, pageHeight, marginBottom, marginTop);
+        doc.setFont("courier","bold");
+        doc.setFontSize(10);
+        doc.setTextColor(130,130,130);
+        doc.text(PANE_LABELS[f].toUpperCase(), marginX, y);
+        doc.setDrawColor(220,220,220);
+        doc.setLineWidth(0.5);
+        doc.line(marginX, y+4, pageWidth-marginX, y+4);
+        y += 22;
+      }
+      if(f === "letra") y = drawLetraPdf(doc, marginX, y, contentWidth, pageHeight, marginBottom, marginTop);
+      else if(f === "cifra") y = drawCifraPdf(doc, marginX, y, contentWidth, pageHeight, marginBottom, marginTop);
+      else if(f === "grade") y = drawGradePdf(doc, marginX, y, contentWidth, pageHeight, marginBottom, marginTop);
+      y += 14;
+    });
+
     const safeTitle = (activeSong.title || "musica").replace(/[^a-z0-9]+/gi,"-").toLowerCase();
     const safeFormat = selectedFormats.join("-");
-    pdf.save(`${safeTitle}-${safeFormat}.pdf`);
+    doc.save(`${safeTitle}-${safeFormat}.pdf`);
   } catch(err){
     alert("Não foi possível gerar o PDF. Tente novamente.");
   } finally{
-    document.body.removeChild(wrap);
     if(btn){ btn.textContent = originalLabel; btn.disabled = false; }
   }
 }
