@@ -88,6 +88,7 @@
 <div id="app"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js"></script>
 <script>
 const STORAGE_KEY = "harmonia_songs_v1";
 let screen = "library";
@@ -247,8 +248,9 @@ function libraryHTML(){
     <div class="library">${cards}</div>`;
 }
 
-let addState = "idle", addError = null, selectedFile = null;
+let addState = "idle", addError = null, addStatusMsg = "", selectedFile = null;
 const MAX_FILE_BYTES = 3 * 1024 * 1024;
+const MAX_SELECT_BYTES = 60 * 1024 * 1024;
 
 function addHTML(){
   const fileLabel = selectedFile ? `${selectedFile.name} (${(selectedFile.size/1e6).toFixed(1)}MB)` : "Nenhum arquivo escolhido";
@@ -257,7 +259,7 @@ function addHTML(){
     <div class="add-screen">
       <div class="eyebrow">Nova música · IA</div>
       <h1>Envie o áudio da música</h1>
-      <p class="sub">Baixe o áudio da música em qualidade baixa/média (até uns 2,5-3MB) e envie o arquivo aqui. A IA ouve e gera letra, cifra e grade rítmica automaticamente.</p>
+      <p class="sub">Envie o arquivo de áudio (qualquer tamanho, até uns 60MB). Se for grande, o app comprime automaticamente antes de enviar. A IA ouve e gera letra, cifra e grade rítmica.</p>
       <div class="link-field" style="cursor:pointer;" onclick="document.getElementById('fileInput').click()">
         <span>🎵</span>
         <span style="flex:1; color:${selectedFile?"var(--ink)":"var(--ink-faint)"}; font-size:14px;">${fileLabel}</span>
@@ -267,7 +269,7 @@ function addHTML(){
       <button class="generate-btn" id="generateBtn" ${addState==="processing"?"disabled":""}>
         ${addState==="processing" ? "Processando..." : "Gerar cifra com IA"}
       </button>
-      ${addState==="processing" ? `<div class="process-note"><div class="spinner"></div> A IA está ouvindo a música — isso roda no servidor, pode aguardar.</div>` : ""}
+      ${addState==="processing" ? `<div class="process-note"><div class="spinner"></div> ${escapeHtml(addStatusMsg || "Processando...")}</div>` : ""}
       ${addError ? `<div class="error-box">${escapeHtml(addError)}</div>` : ""}
     </div>`;
 }
@@ -346,8 +348,8 @@ function bindEvents(){
   if(fileInput) fileInput.onchange = (e) => {
     const file = e.target.files[0];
     if(!file) return;
-    if(file.size > MAX_FILE_BYTES){
-      addError = `Esse arquivo tem ${(file.size/1e6).toFixed(1)}MB — o limite é ~3MB. Baixe numa qualidade menor (ex: 64kbps) e tente de novo.`;
+    if(file.size > MAX_SELECT_BYTES){
+      addError = `Esse arquivo tem ${(file.size/1e6).toFixed(1)}MB — envie algo até 60MB.`;
       selectedFile = null;
     } else {
       addError = null;
@@ -535,6 +537,61 @@ async function downloadPdf(btn){
   }
 }
 
+async function decodeToMonoPCM(file, targetSampleRate){
+  const arrayBuffer = await file.arrayBuffer();
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  const tempCtx = new AudioCtx();
+  let decoded;
+  try{
+    decoded = await tempCtx.decodeAudioData(arrayBuffer);
+  } finally {
+    tempCtx.close();
+  }
+  const offlineCtx = new OfflineAudioContext(1, Math.ceil(decoded.duration * targetSampleRate) + 1, targetSampleRate);
+  const source = offlineCtx.createBufferSource();
+  source.buffer = decoded;
+  source.connect(offlineCtx.destination);
+  source.start(0);
+  const rendered = await offlineCtx.startRendering();
+  const channelData = rendered.getChannelData(0);
+  const samples = new Int16Array(channelData.length);
+  for(let i=0;i<channelData.length;i++){
+    let s = Math.max(-1, Math.min(1, channelData[i]));
+    samples[i] = s < 0 ? s*0x8000 : s*0x7FFF;
+  }
+  return samples;
+}
+
+function encodeMp3FromPCM(samples, sampleRate, kbps){
+  const mp3encoder = new lamejs.Mp3Encoder(1, sampleRate, kbps);
+  const blockSize = 1152;
+  const mp3Data = [];
+  for(let i=0;i<samples.length;i+=blockSize){
+    const chunk = samples.subarray(i, i+blockSize);
+    const mp3buf = mp3encoder.encodeBuffer(chunk);
+    if(mp3buf.length > 0) mp3Data.push(mp3buf);
+  }
+  const endBuf = mp3encoder.flush();
+  if(endBuf.length > 0) mp3Data.push(endBuf);
+  return new Blob(mp3Data, { type: "audio/mp3" });
+}
+
+async function compressAudioIfNeeded(file){
+  if(file.size <= MAX_FILE_BYTES) return { blob: file, mimeType: file.type || "audio/mpeg" };
+  const targetSampleRate = 22050;
+  const samples = await decodeToMonoPCM(file, targetSampleRate);
+  const bitrates = [64, 48, 32];
+  let lastBlob = null;
+  for(const kbps of bitrates){
+    const blob = encodeMp3FromPCM(samples, targetSampleRate, kbps);
+    lastBlob = blob;
+    if(blob.size <= MAX_FILE_BYTES){
+      return { blob, mimeType: "audio/mp3" };
+    }
+  }
+  throw new Error("Mesmo comprimido, o áudio ainda ficou grande demais (a música deve ser muito longa). Tente enviar um trecho mais curto.");
+}
+
 function fileToBase64(file){
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -551,17 +608,21 @@ async function generateSong(){
   if(!selectedFile){ addError = "Escolha um arquivo de áudio antes de gerar."; renderApp(); return; }
   addState = "processing";
   addError = null;
+  addStatusMsg = selectedFile.size > MAX_FILE_BYTES ? "Comprimindo áudio..." : "Preparando o áudio...";
   renderApp();
   try{
-    const audioBase64 = await fileToBase64(selectedFile);
+    const { blob, mimeType } = await compressAudioIfNeeded(selectedFile);
+    addStatusMsg = "A IA está ouvindo a música — isso roda no servidor, pode aguardar.";
+    renderApp();
+    const audioBase64 = await fileToBase64(blob);
     const resp = await fetch("/api/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ audioBase64, mimeType: selectedFile.type || "audio/mpeg" }),
+      body: JSON.stringify({ audioBase64, mimeType }),
     });
     let data;
     try{ data = await resp.json(); }
-    catch(e){ throw new Error("O servidor recusou o arquivo (muito grande). Tente um áudio menor / qualidade mais baixa (mire em uns 2,5MB ou menos)."); }
+    catch(e){ throw new Error("O servidor recusou o arquivo (muito grande). Tente um trecho mais curto da música."); }
     if(!resp.ok) throw new Error(data.error || "Erro ao gerar a música.");
     library.unshift(data.song);
     saveLibrary();
@@ -582,4 +643,4 @@ async function generateSong(){
 renderApp();
 </script>
 </body>
-</html>
+  </html>
