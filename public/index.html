@@ -82,6 +82,11 @@
 
   .print-btn{ background:var(--bg-raised) !important; color:var(--sage) !important; border:1px solid var(--hairline) !important; font-size:12px !important; padding:8px 12px !important; }
   .print-btn:disabled{ opacity:.6; }
+
+  .login-screen{ min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:32px; }
+  .login-title{ font-family:var(--font-display); font-size:32px; font-weight:700; margin-bottom:10px; }
+  .login-sub{ color:var(--ink-dim); font-size:14px; line-height:1.6; max-width:320px; margin-bottom:28px; }
+  .google-btn{ background:#fff; color:#1F1F1F; border:none; border-radius:999px; padding:13px 26px; font-family:var(--font-body); font-weight:600; font-size:14.5px; cursor:pointer; }
 </style>
 </head>
 <body>
@@ -89,19 +94,64 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script>
+const firebaseConfig = {
+  apiKey: "AIzaSyCCLBxr2O3trO9wSPD3xKk3J30cwoZEaHQ",
+  authDomain: "harmonia-lite.firebaseapp.com",
+  projectId: "harmonia-lite",
+  storageBucket: "harmonia-lite.firebasestorage.app",
+  messagingSenderId: "932307227066",
+  appId: "1:932307227066:web:650e5b374c61e1f4014d83"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
 const STORAGE_KEY = "harmonia_songs_v1";
-let screen = "library";
-let library = loadLibrary();
+let screen = "loading";
+let library = [];
 let activeSong = null;
 let selectedFormats = ["letra"];
 let transposeAmount = 0;
+let currentUser = null;
+let unsubscribeLibrary = null;
 
-function loadLibrary(){
-  try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
-  catch(e){ return []; }
+function songsCollection(){
+  return db.collection("users").doc(currentUser.uid).collection("songs");
 }
-function saveLibrary(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(library)); }
+
+function attachLibraryListener(){
+  if(unsubscribeLibrary) unsubscribeLibrary();
+  unsubscribeLibrary = songsCollection()
+    .orderBy("createdAt", "desc")
+    .onSnapshot(snap => {
+      library = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderApp();
+    }, err => {
+      console.error("Firestore listener error:", err);
+    });
+}
+
+auth.onAuthStateChanged(user => {
+  if(user){
+    currentUser = user;
+    attachLibraryListener();
+    if(screen === "loading" || screen === "login") screen = "library";
+  } else {
+    currentUser = null;
+    if(unsubscribeLibrary){ unsubscribeLibrary(); unsubscribeLibrary = null; }
+    library = [];
+    screen = "login";
+  }
+  renderApp();
+});
+
+auth.getRedirectResult().catch(err => {
+  console.error("Erro no login:", err);
+});
 
 const CHROMATIC = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 function transposeChord(chord, semitones){
@@ -225,26 +275,47 @@ const PANE_RENDERERS = { letra:renderLetra, cifra:renderCifra, grade:renderGrade
 
 function renderApp(){
   const app = document.getElementById("app");
-  if(screen === "library") app.innerHTML = libraryHTML();
+  if(screen === "loading") app.innerHTML = loadingHTML();
+  else if(screen === "login") app.innerHTML = loginHTML();
+  else if(screen === "library") app.innerHTML = libraryHTML();
   else if(screen === "add") app.innerHTML = addHTML();
   else app.innerHTML = songHTML();
   bindEvents();
   if(screen === "song") fitStaffPages();
 }
 
+function loadingHTML(){
+  return `<div class="login-screen"><div class="spinner"></div></div>`;
+}
+
+function loginHTML(){
+  return `
+    <div class="login-screen">
+      <div class="login-title">🎵 Harmonia</div>
+      <p class="login-sub">Sua biblioteca de letras, cifras e grades rítmicas, sincronizada na nuvem.</p>
+      <button class="google-btn" data-google-login="1">Entrar com Google</button>
+    </div>`;
+}
+
 function libraryHTML(){
   const cards = library.length
-    ? library.map((s,i) => `
-      <div class="song-card" data-open="${i}">
+    ? library.map((s) => `
+      <div class="song-card" data-open="${s.id}">
         <div>
           <h3>${escapeHtml(s.title)}</h3>
           <p>${escapeHtml(s.artist || "")} · Tom: ${escapeHtml(s.originalKey||"?")} · ${s.bpm||"?"} BPM</p>
         </div>
-        <span class="del" data-del="${i}">✕</span>
+        <span class="del" data-del="${s.id}">✕</span>
       </div>`).join("")
     : `<div class="empty-state">Sua biblioteca está vazia.<br>Toque em "+ Nova música" e envie um arquivo de áudio.</div>`;
   return `
-    <div class="topbar"><h2>🎵 Harmonia</h2><button data-nav="add">+ Nova música</button></div>
+    <div class="topbar">
+      <h2>🎵 Harmonia</h2>
+      <div style="display:flex; gap:8px;">
+        <button class="print-btn" data-logout="1">Sair</button>
+        <button data-nav="add">+ Nova música</button>
+      </div>
+    </div>
     <div class="library">${cards}</div>`;
 }
 
@@ -323,7 +394,7 @@ function bindEvents(){
     renderApp();
   });
   document.querySelectorAll("[data-open]").forEach(el => el.onclick = () => {
-    activeSong = library[+el.dataset.open];
+    activeSong = library.find(s => s.id === el.dataset.open);
     selectedFormats = ["letra"];
     transposeAmount = 0;
     screen = "song";
@@ -331,9 +402,7 @@ function bindEvents(){
   });
   document.querySelectorAll("[data-del]").forEach(el => el.onclick = (e) => {
     e.stopPropagation();
-    library.splice(+el.dataset.del, 1);
-    saveLibrary();
-    renderApp();
+    songsCollection().doc(el.dataset.del).delete().catch(err => console.error(err));
   });
   document.querySelectorAll("[data-formats]").forEach(el => el.onclick = () => {
     selectedFormats = JSON.parse(el.dataset.formats);
@@ -344,6 +413,12 @@ function bindEvents(){
     renderApp();
   });
   document.querySelectorAll("[data-print]").forEach(el => el.onclick = () => downloadPdf(el));
+  document.querySelectorAll("[data-google-login]").forEach(el => el.onclick = () => {
+    auth.signInWithRedirect(new firebase.auth.GoogleAuthProvider());
+  });
+  document.querySelectorAll("[data-logout]").forEach(el => el.onclick = () => {
+    auth.signOut();
+  });
   const fileInput = document.getElementById("fileInput");
   if(fileInput) fileInput.onchange = (e) => {
     const file = e.target.files[0];
@@ -624,23 +699,4 @@ async function generateSong(){
     try{ data = await resp.json(); }
     catch(e){ throw new Error("O servidor recusou o arquivo (muito grande). Tente um trecho mais curto da música."); }
     if(!resp.ok) throw new Error(data.error || "Erro ao gerar a música.");
-    library.unshift(data.song);
-    saveLibrary();
-    activeSong = data.song;
-    selectedFormats = ["letra"];
-    transposeAmount = 0;
-    screen = "song";
-    addState = "idle";
-    selectedFile = null;
-    renderApp();
-  } catch(err){
-    addState = "idle";
-    addError = err.message || "Não foi possível gerar a música. Tente novamente.";
-    renderApp();
-  }
-}
-
-renderApp();
-</script>
-</body>
-  </html>
+    const
