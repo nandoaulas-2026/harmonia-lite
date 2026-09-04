@@ -94,9 +94,9 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script>
 const firebaseConfig = {
   apiKey: "AIzaSyCCLBxr2O3trO9wSPD3xKk3J30cwoZEaHQ",
@@ -699,4 +699,25 @@ async function generateSong(){
     try{ data = await resp.json(); }
     catch(e){ throw new Error("O servidor recusou o arquivo (muito grande). Tente um trecho mais curto da música."); }
     if(!resp.ok) throw new Error(data.error || "Erro ao gerar a música.");
-    const
+    const docRef = await songsCollection().add({
+      ...data.song,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    activeSong = { id: docRef.id, ...data.song };
+    selectedFormats = ["letra"];
+    transposeAmount = 0;
+    addState = "idle";
+    selectedFile = null;
+    screen = "song";
+    renderApp();
+  } catch(err){
+    addState = "idle";
+    addError = err.message || "Não foi possível gerar a música. Tente novamente.";
+    renderApp();
+  }
+}
+
+renderApp();
+</script>
+</body>
+  </html>
