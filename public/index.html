@@ -149,8 +149,12 @@ auth.onAuthStateChanged(user => {
   renderApp();
 });
 
+let authError = null;
+
 auth.getRedirectResult().catch(err => {
-  console.error("Erro no login:", err);
+  authError = err.code ? `${err.code} — ${err.message}` : String(err.message || err);
+  screen = "login";
+  renderApp();
 });
 
 const CHROMATIC = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
@@ -294,6 +298,7 @@ function loginHTML(){
       <div class="login-title">🎵 Harmonia</div>
       <p class="login-sub">Sua biblioteca de letras, cifras e grades rítmicas, sincronizada na nuvem.</p>
       <button class="google-btn" data-google-login="1">Entrar com Google</button>
+      ${authError ? `<div class="error-box" style="max-width:320px; margin-top:20px; text-align:left;">${escapeHtml(authError)}</div>` : ""}
     </div>`;
 }
 
@@ -534,190 +539,4 @@ function drawGradePdf(doc, x0, y, width, pageHeight, marginBottom, marginTop){
       doc.text(shownChord, mx+4, top+9);
       doc.setDrawColor(20,20,20);
       doc.setLineWidth(1.2);
-      for(let b=0;b<4;b++){
-        const bx = mx + 16 + b*((MW-24)/3);
-        doc.line(bx-4, mid+6, bx+4, mid-6);
-      }
-      const xEnd = mx+MW;
-      doc.setLineWidth(m.doubleBarAfter ? 1.6 : 0.7);
-      doc.line(xEnd-2, top, xEnd-2, bottom);
-      if(m.cue){
-        doc.setFont("helvetica","italic");
-        doc.setFontSize(7);
-        doc.setTextColor(120,120,120);
-        doc.text(m.cue, mx+4, bottom+10);
-      }
-    });
-    y = bottom + 18;
-  });
-  return y;
-}
-
-async function downloadPdf(btn){
-  if(!activeSong) return;
-  const originalLabel = btn ? btn.textContent : null;
-  if(btn){ btn.textContent = "Gerando..."; btn.disabled = true; }
-  try{
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF("p","pt","a4");
-    const marginX = 42, marginTop = 50, marginBottom = 50;
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const contentWidth = pageWidth - marginX*2;
-    let y = marginTop;
-
-    doc.setFont("helvetica","bold");
-    doc.setFontSize(18);
-    doc.setTextColor(20,20,20);
-    doc.text(activeSong.title || "Sem título", marginX, y);
-    y += 22;
-    if(activeSong.artist){
-      doc.setFont("helvetica","normal");
-      doc.setFontSize(11);
-      doc.setTextColor(90,90,90);
-      doc.text(activeSong.artist, marginX, y);
-      y += 16;
-    }
-    doc.setFont("courier","normal");
-    doc.setFontSize(9);
-    doc.setTextColor(120,120,120);
-    doc.text(`Tom: ${currentKeyLabel()}  ·  ${activeSong.bpm||"?"} BPM`, marginX, y);
-    y += 26;
-
-    selectedFormats.forEach(f => {
-      if(selectedFormats.length > 1){
-        y = ensureSpace(doc, y, 30, pageHeight, marginBottom, marginTop);
-        doc.setFont("courier","bold");
-        doc.setFontSize(10);
-        doc.setTextColor(130,130,130);
-        doc.text(PANE_LABELS[f].toUpperCase(), marginX, y);
-        doc.setDrawColor(220,220,220);
-        doc.setLineWidth(0.5);
-        doc.line(marginX, y+4, pageWidth-marginX, y+4);
-        y += 22;
-      }
-      if(f === "letra") y = drawLetraPdf(doc, marginX, y, contentWidth, pageHeight, marginBottom, marginTop);
-      else if(f === "cifra") y = drawCifraPdf(doc, marginX, y, contentWidth, pageHeight, marginBottom, marginTop);
-      else if(f === "grade") y = drawGradePdf(doc, marginX, y, contentWidth, pageHeight, marginBottom, marginTop);
-      y += 14;
-    });
-
-    const safeTitle = (activeSong.title || "musica").replace(/[^a-z0-9]+/gi,"-").toLowerCase();
-    const safeFormat = selectedFormats.join("-");
-    doc.save(`${safeTitle}-${safeFormat}.pdf`);
-  } catch(err){
-    alert("Não foi possível gerar o PDF. Tente novamente.");
-  } finally{
-    if(btn){ btn.textContent = originalLabel; btn.disabled = false; }
-  }
-}
-
-async function decodeToMonoPCM(file, targetSampleRate){
-  const arrayBuffer = await file.arrayBuffer();
-  const AudioCtx = window.AudioContext || window.webkitAudioContext;
-  const tempCtx = new AudioCtx();
-  let decoded;
-  try{
-    decoded = await tempCtx.decodeAudioData(arrayBuffer);
-  } finally {
-    tempCtx.close();
-  }
-  const offlineCtx = new OfflineAudioContext(1, Math.ceil(decoded.duration * targetSampleRate) + 1, targetSampleRate);
-  const source = offlineCtx.createBufferSource();
-  source.buffer = decoded;
-  source.connect(offlineCtx.destination);
-  source.start(0);
-  const rendered = await offlineCtx.startRendering();
-  const channelData = rendered.getChannelData(0);
-  const samples = new Int16Array(channelData.length);
-  for(let i=0;i<channelData.length;i++){
-    let s = Math.max(-1, Math.min(1, channelData[i]));
-    samples[i] = s < 0 ? s*0x8000 : s*0x7FFF;
-  }
-  return samples;
-}
-
-function encodeMp3FromPCM(samples, sampleRate, kbps){
-  const mp3encoder = new lamejs.Mp3Encoder(1, sampleRate, kbps);
-  const blockSize = 1152;
-  const mp3Data = [];
-  for(let i=0;i<samples.length;i+=blockSize){
-    const chunk = samples.subarray(i, i+blockSize);
-    const mp3buf = mp3encoder.encodeBuffer(chunk);
-    if(mp3buf.length > 0) mp3Data.push(mp3buf);
-  }
-  const endBuf = mp3encoder.flush();
-  if(endBuf.length > 0) mp3Data.push(endBuf);
-  return new Blob(mp3Data, { type: "audio/mp3" });
-}
-
-async function compressAudioIfNeeded(file){
-  if(file.size <= MAX_FILE_BYTES) return { blob: file, mimeType: file.type || "audio/mpeg" };
-  const targetSampleRate = 22050;
-  const samples = await decodeToMonoPCM(file, targetSampleRate);
-  const bitrates = [64, 48, 32];
-  let lastBlob = null;
-  for(const kbps of bitrates){
-    const blob = encodeMp3FromPCM(samples, targetSampleRate, kbps);
-    lastBlob = blob;
-    if(blob.size <= MAX_FILE_BYTES){
-      return { blob, mimeType: "audio/mp3" };
-    }
-  }
-  throw new Error("Mesmo comprimido, o áudio ainda ficou grande demais (a música deve ser muito longa). Tente enviar um trecho mais curto.");
-}
-
-function fileToBase64(file){
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64 = reader.result.split(",")[1];
-      resolve(base64);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-async function generateSong(){
-  if(!selectedFile){ addError = "Escolha um arquivo de áudio antes de gerar."; renderApp(); return; }
-  addState = "processing";
-  addError = null;
-  addStatusMsg = selectedFile.size > MAX_FILE_BYTES ? "Comprimindo áudio..." : "Preparando o áudio...";
-  renderApp();
-  try{
-    const { blob, mimeType } = await compressAudioIfNeeded(selectedFile);
-    addStatusMsg = "A IA está ouvindo a música — isso roda no servidor, pode aguardar.";
-    renderApp();
-    const audioBase64 = await fileToBase64(blob);
-    const resp = await fetch("/api/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ audioBase64, mimeType }),
-    });
-    let data;
-    try{ data = await resp.json(); }
-    catch(e){ throw new Error("O servidor recusou o arquivo (muito grande). Tente um trecho mais curto da música."); }
-    if(!resp.ok) throw new Error(data.error || "Erro ao gerar a música.");
-    const docRef = await songsCollection().add({
-      ...data.song,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    activeSong = { id: docRef.id, ...data.song };
-    selectedFormats = ["letra"];
-    transposeAmount = 0;
-    addState = "idle";
-    selectedFile = null;
-    screen = "song";
-    renderApp();
-  } catch(err){
-    addState = "idle";
-    addError = err.message || "Não foi possível gerar a música. Tente novamente.";
-    renderApp();
-  }
-}
-
-renderApp();
-</script>
-</body>
-  </html>
+      for(let b=0;b
