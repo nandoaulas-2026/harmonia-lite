@@ -419,7 +419,11 @@ function bindEvents(){
   });
   document.querySelectorAll("[data-print]").forEach(el => el.onclick = () => downloadPdf(el));
   document.querySelectorAll("[data-google-login]").forEach(el => el.onclick = () => {
-    auth.signInWithRedirect(new firebase.auth.GoogleAuthProvider());
+    authError = null;
+    auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(err => {
+      authError = err.code ? `${err.code} — ${err.message}` : String(err.message || err);
+      renderApp();
+    });
   });
   document.querySelectorAll("[data-logout]").forEach(el => el.onclick = () => {
     auth.signOut();
@@ -725,4 +729,4 @@ async function generateSong(){
 renderApp();
 </script>
 </body>
-  </html>
+</html>
