@@ -123,12 +123,22 @@ function songsCollection(){
   return db.collection("users").doc(currentUser.uid).collection("songs");
 }
 
+function chordLinesToFirestore(chordLines){
+  return (chordLines || []).map(line => ({ chunks: line || [] }));
+}
+function chordLinesFromFirestore(chordLines){
+  return (chordLines || []).map(line => (line && line.chunks) || []);
+}
+
 function attachLibraryListener(){
   if(unsubscribeLibrary) unsubscribeLibrary();
   unsubscribeLibrary = songsCollection()
     .orderBy("createdAt", "desc")
     .onSnapshot(snap => {
-      library = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      library = snap.docs.map(d => {
+        const raw = d.data();
+        return { id: d.id, ...raw, chordLines: chordLinesFromFirestore(raw.chordLines) };
+      });
       renderApp();
     }, err => {
       console.error("Firestore listener error:", err);
@@ -710,6 +720,7 @@ async function generateSong(){
     if(!resp.ok) throw new Error(data.error || "Erro ao gerar a música.");
     const docRef = await songsCollection().add({
       ...data.song,
+      chordLines: chordLinesToFirestore(data.song.chordLines),
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     activeSong = { id: docRef.id, ...data.song };
@@ -729,4 +740,4 @@ async function generateSong(){
 renderApp();
 </script>
 </body>
-</html>
+  </html>
