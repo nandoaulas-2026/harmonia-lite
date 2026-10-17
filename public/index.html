@@ -394,6 +394,7 @@ function audioBufferToWav(buffer, sampleRate) {
   const numOfChan = buffer.numberOfChannels;
   const length = buffer.length * numOfChan * 2 + 44;
   const out = new DataView(new ArrayBuffer(length));
+  let channels = [];
   let offset = 0;
   let pos = 0;
 
