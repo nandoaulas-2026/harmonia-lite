@@ -1,5 +1,20 @@
 import { GoogleGenAI } from "@google/genai";
 
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
+async function getRawBody(req) {
+  return new Promise((resolve, reject) => {
+    let buffers = [];
+    req.on('data', chunk => buffers.push(chunk));
+    req.on('end', () => resolve(Buffer.concat(buffers)));
+    req.on('error', err => reject(err));
+  });
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -14,6 +29,12 @@ export default async function handler(req, res) {
   }
 
   try {
+    const audioBuffer = await getRawBody(req);
+    if (!audioBuffer || audioBuffer.length === 0) {
+      return res.status(400).json({ error: 'Nenhum áudio recebido.' });
+    }
+
+    const base64Audio = audioBuffer.toString("base64");
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     const modelName = 'gemini-2.5-flash';
 
@@ -58,7 +79,15 @@ export default async function handler(req, res) {
       try {
         response = await ai.models.generateContent({
           model: modelName,
-          contents: [prompt],
+          contents: [
+            prompt,
+            {
+              inlineData: {
+                mimeType: "audio/wav",
+                data: base64Audio
+              }
+            }
+          ],
           config: {
             responseMimeType: "application/json"
           }
