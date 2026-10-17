@@ -36,7 +36,9 @@ module.exports = async function handler(req, res) {
 
     const base64Audio = audioBuffer.toString("base64");
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const modelName = 'gemini-2.5-flash';
+    
+    // Modelo oficial atualizado e compatível
+    const modelName = 'gemini-1.5-flash';
 
     const prompt = `
       Você é um músico profissional especialista em transcrição e teoria musical. 
