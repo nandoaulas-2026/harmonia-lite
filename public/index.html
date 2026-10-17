@@ -584,16 +584,16 @@ async function startProcessing(){
   renderAddScreen();
 
   try {
-    // 1. Comprime no navegador
+    // 1. Comprime no navegador para ficar leve (< 4MB)
     const arquivoComprimido = await comprimirAudioAntesDoEnvio(selectedFile);
 
-    // 2. Envia para o servidor da Vercel
-    const formData = new FormData();
-    formData.append("audio", arquivoComprimido);
-
+    // 2. Envia o áudio comprimido diretamente como binário para o servidor
     const response = await fetch("/api/analisar", {
       method: "POST",
-      body: formData
+      headers: {
+        "Content-Type": "audio/wav"
+      },
+      body: arquivoComprimido
     });
 
     if(!response.ok) {
