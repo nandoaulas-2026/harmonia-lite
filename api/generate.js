@@ -1,86 +1,97 @@
-// api/generate.js
-// Função serverless (roda na Vercel). Recebe um arquivo de áudio (enviado
-// pelo próprio usuário, já em base64) e pede pra IA (Gemini) devolver
-// letra + cifra + grade já no formato que o app usa.
-//
-// OBS: essa versão NÃO baixa mais áudio do YouTube no servidor — o YouTube
-// passou a bloquear esse tipo de download vindo de servidores (mesmo com
-// login), então agora é o usuário quem baixa o áudio e envia o arquivo.
-
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
-export const config = {
-  maxDuration: 60,
-};
-
-const PROMPT = `Você é um transcritor musical profissional (letrista + cifrista + arranjador).
-Ouça o áudio anexado do início ao fim e devolva SOMENTE um JSON válido, sem markdown,
-sem crases, sem texto antes ou depois — apenas o objeto JSON, no formato exato abaixo:
-
-{
-  "title": "string",
-  "artist": "string (ou \\"Artista não identificado\\")",
-  "originalKey": "nota, ex: G, Am, D",
-  "bpm": 90,
-  "lyricSections": [
-    { "label": "Intro | Verso 1 | Pré-Refrão | Refrão | Ponte | Solo | Final",
-      "lines": ["linha 1 da letra", "linha 2 da letra"] }
-  ],
-  "chordLines": [
-    [ { "chord": "G", "text": "trecho da letra correspondente " },
-      { "chord": "Em", "text": "próximo trecho" } ]
-  ],
-  "measures": [
-    { "chord": "G", "section": "Estrofe" ,"cue": null, "doubleBarAfter": false }
-  ]
-}
-
-Regras importantes:
-- "measures": um objeto por compasso, cobrindo a música inteira em 4/4 (aproxime se não for 4/4).
-- "section": preencha só no compasso em que uma nova seção começa (ex: "Estrofe", "Refrão", "Ponte", "Intro"). Nos demais compassos, use null.
-- "cue": só quando houver uma marcação de arranjo clara e audível (ex: "break — todos param", "bateria entra", "só voz e violão"). Caso contrário, null.
-- "doubleBarAfter": true no último compasso de cada seção/trecho.
-- Seja fiel à letra e aos acordes reais ouvidos na gravação — não invente progressão genérica.
-- Se não conseguir ouvir algum trecho com clareza, faça a melhor aproximação possível, mas nunca deixe campos vazios ou ausentes.`;
+import { GoogleGenAI } from "@google/genai";
 
 export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Método não permitido." });
+  // Configuração de CORS para permitir requisições do frontend
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
   }
 
-  const { audioBase64, mimeType } = req.body || {};
-  if (!audioBase64) {
-    return res.status(400).json({ error: "Nenhum arquivo de áudio recebido." });
-  }
-  if (!process.env.GEMINI_API_KEY) {
-    return res.status(500).json({ error: "GEMINI_API_KEY não configurada no servidor." });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Método não permitido' });
   }
 
   try {
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-3.6-flash" });
+    // Inicializa a API do Gemini com a chave de ambiente configurada na Vercel
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-    const result = await model.generateContent([
-      { inlineData: { data: audioBase64, mimeType: mimeType || "audio/mpeg" } },
-      { text: PROMPT },
-    ]);
+    // Recolhe os dados enviados pelo frontend (ajuste conforme o seu formulário)
+    // Exemplo simulado de receção do áudio / prompt
+    const { audioData, promptText } = req.body || {};
 
-    const rawText = result.response.text().trim();
-    const cleaned = rawText.replace(/^```json\s*|\s*```$/g, "").replace(/^```\s*|\s*```$/g, "");
+    // Usando um modelo estável e rápido para evitar erros de sobrecarga (503)
+    const modelName = 'gemini-2.5-flash';
 
-    let song;
-    try {
-      song = JSON.parse(cleaned);
-    } catch (parseErr) {
-      return res.status(502).json({
-        error: "A IA respondeu em um formato inesperado. Tente novamente.",
-        raw: rawText.slice(0, 500),
-      });
+    const prompt = promptText || `
+      Você é um músico profissional especialista em transcrição e teoria musical. 
+      Escute atentamente este áudio e extraia com precisão as seguintes informações musicais.
+      Sua resposta DEVE ser estritamente um objeto JSON válido, sem formatação extra de código markdown, seguindo exatamente este esquema:
+      {
+        "title": "Nome da Música",
+        "artist": "Nome do Artista/Banda",
+        "originalKey": "Tom Original (ex: G, C#, Bm)",
+        "bpm": 92,
+        "lyricSections": [
+          {
+            "label": "Intro",
+            "lines": ["(instrumental)"]
+          }
+        ],
+        "chordLines": [
+          [
+            {"chord": "G", "text": "Texto da linha "}
+          ]
+        ],
+        "measures": [
+          {
+            "chord": "G",
+            "section": "Intro",
+            "cue": null,
+            "doubleBarAfter": false
+          }
+        ]
+      }
+    `;
+
+    // Sistema de tentativas automáticas (Retry) caso ocorra instabilidade temporária
+    let response;
+    let success = false;
+    let attempts = 0;
+    const maxAttempts = 3;
+
+    while (!success && attempts < maxAttempts) {
+      attempts++;
+      try {
+        response = await ai.models.generateContent({
+          model: modelName,
+          contents: [prompt],
+          config: {
+            responseMimeType: "application/json"
+          }
+        });
+        success = true;
+      } catch (err) {
+        // Se o erro for 503 (servidor ocupado) e ainda tivermos tentativas, aguarda 2 segundos e tenta de novo
+        if (err.message && err.message.includes('503') && attempts < maxAttempts) {
+          console.warn(`Tentativa ${attempts} falhou com erro 503. Tentando novamente em 2 segundos...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        } else {
+          throw err;
+        }
+      }
     }
 
-    return res.status(200).json({ song });
-  } catch (err) {
-    console.error("Erro em /api/generate:", err);
-    return res.status(500).json({ error: "Falha ao processar a música: " + (err.message || "erro desconhecido") });
+    // Retorna o JSON processado com sucesso para a tela
+    const parsedData = JSON.parse(response.text);
+    return res.status(200).json(parsedData);
+
+  } catch (error) {
+    console.error("Falha ao processar a música:", error);
+    return res.status(500).json({ 
+      error: `Falha ao processar a música: ${error.message}` 
+    });
   }
 }
