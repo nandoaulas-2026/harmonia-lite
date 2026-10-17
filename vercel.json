@@ -1,6 +1,6 @@
 {
   "functions": {
-    "api/generate.js": {
+    "api/analisar.js": {
       "maxDuration": 60
     }
   }
