@@ -37,8 +37,8 @@ module.exports = async function handler(req, res) {
     const base64Audio = audioBuffer.toString("base64");
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     
-    // Modelo oficial e estável
-    const modelName = 'gemini-2.5-flash';
+    // Modelo oficial atualizado conforme exigido pela API
+    const modelName = 'gemini-3.8-flash';
 
     const prompt = `
       Você é um músico profissional especialista em transcrição e teoria musical. 
@@ -105,12 +105,10 @@ module.exports = async function handler(req, res) {
     }
 
     let rawText = response.text || "";
-    // Limpa eventuais marcadores de código do markdown ```json ... ```
     rawText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
     
     const parsedData = JSON.parse(rawText);
 
-    // Estruturação garantida para não quebrar a renderização do frontend
     const sanitizedData = {
       title: parsedData.title || "Música Processada",
       artist: parsedData.artist || "Artista Reconhecido",
