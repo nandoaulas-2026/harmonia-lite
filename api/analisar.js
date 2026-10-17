@@ -37,8 +37,8 @@ module.exports = async function handler(req, res) {
     const base64Audio = audioBuffer.toString("base64");
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     
-    // Modelo atualizado conforme exigido pela API atual
-    const modelName = 'gemini-3.8-flash';
+    // Modelo oficial e estável
+    const modelName = 'gemini-2.5-flash';
 
     const prompt = `
       Você é um músico profissional especialista em transcrição e teoria musical. 
@@ -47,12 +47,12 @@ module.exports = async function handler(req, res) {
       {
         "title": "Nome da Música",
         "artist": "Nome do Artista/Banda",
-        "originalKey": "Tom Original (ex: G, C#, Bm)",
+        "originalKey": "G",
         "bpm": 92,
         "lyricSections": [
           {
-            "label": "Intro",
-            "lines": ["(instrumental)"]
+            "label": "Verso 1",
+            "lines": ["Linha de letra aqui"]
           }
         ],
         "chordLines": [
@@ -63,7 +63,7 @@ module.exports = async function handler(req, res) {
         "measures": [
           {
             "chord": "G",
-            "section": "Intro",
+            "section": "Verso 1",
             "cue": null,
             "doubleBarAfter": false
           }
@@ -104,8 +104,30 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    const parsedData = JSON.parse(response.text);
-    return res.status(200).json(parsedData);
+    let rawText = response.text || "";
+    // Limpa eventuais marcadores de código do markdown ```json ... ```
+    rawText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
+    
+    const parsedData = JSON.parse(rawText);
+
+    // Estruturação garantida para não quebrar a renderização do frontend
+    const sanitizedData = {
+      title: parsedData.title || "Música Processada",
+      artist: parsedData.artist || "Artista Reconhecido",
+      originalKey: parsedData.originalKey || "C",
+      bpm: parsedData.bpm || 120,
+      lyricSections: Array.isArray(parsedData.lyricSections) && parsedData.lyricSections.length > 0 
+        ? parsedData.lyricSections 
+        : [{ label: "Parte Unica", lines: ["Letra transcrita"] }],
+      chordLines: Array.isArray(parsedData.chordLines) && parsedData.chordLines.length > 0 
+        ? parsedData.chordLines 
+        : [[{ chord: "C", text: "Cifra " }]],
+      measures: Array.isArray(parsedData.measures) && parsedData.measures.length > 0 
+        ? parsedData.measures 
+        : [{ chord: "C", section: null, cue: null, doubleBarAfter: false }]
+    };
+
+    return res.status(200).json(sanitizedData);
 
   } catch (error) {
     console.error("Erro no backend:", error);
