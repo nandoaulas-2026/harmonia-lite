@@ -3,173 +3,442 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Harmonia</title>
+<title>Harmonia — Protótipo & IA</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&family=Source+Serif+4:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg: #121316; --bg-raised: #1B1D22; --bg-panel: #202329;
-    --hairline: #33363D; --ink: #F0EDE6; --ink-dim: #9A9CA3; --ink-faint: #5C5E66;
-    --brass: #E8A33D; --sage: #5FA8A0; --danger: #D9695F;
+    --bg: #121316;
+    --bg-raised: #1B1D22;
+    --bg-panel: #202329;
+    --hairline: #33363D;
+    --ink: #F0EDE6;
+    --ink-dim: #9A9CA3;
+    --ink-faint: #5C5E66;
+    --brass: #E8A33D;
+    --brass-dim: #7A5A28;
+    --sage: #5FA8A0;
+    --danger: #D9695F;
     --radius: 14px;
     --font-display: 'Space Grotesk', sans-serif;
     --font-body: 'Inter', sans-serif;
     --font-mono: 'IBM Plex Mono', monospace;
-    --paper-bg: #FBFAF6; --paper-ink: #1E1C18; --paper-ink-dim: #6B6A63; --paper-line: #8A887F;
+    --font-score: 'Source Serif 4', Georgia, serif;
+    --paper-bg: #FBFAF6;
+    --paper-ink: #1E1C18;
+    --paper-ink-dim: #6B6A63;
+    --paper-line: #8A887F;
   }
   *{box-sizing:border-box;}
-  body{ margin:0; background:#0B0C0E; font-family:var(--font-body); color:var(--ink); min-height:100vh; }
-  #app{ max-width: 720px; margin: 0 auto; min-height:100vh; background:var(--bg); position:relative; }
+  body{
+    margin:0;
+    background: #0B0C0E;
+    font-family: var(--font-body);
+    color: var(--ink);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding: 32px 16px 80px;
+  }
+  .lab-note{
+    color: var(--ink-faint);
+    font-size: 12px;
+    font-family: var(--font-mono);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 18px;
+  }
+  .device{
+    width: 390px;
+    max-width: 100%;
+    background: var(--bg);
+    border-radius: 34px;
+    border: 1px solid #2A2C32;
+    box-shadow: 0 40px 80px -30px rgba(0,0,0,0.7);
+    overflow:hidden;
+    position:relative;
+  }
+  .mode-toggle{
+    display:flex;
+    gap:8px;
+    margin-bottom:20px;
+  }
+  .mode-toggle button{
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing:0.03em;
+    text-transform: uppercase;
+    background: var(--bg-raised);
+    color: var(--ink-dim);
+    border: 1px solid var(--hairline);
+    border-radius: 999px;
+    padding: 8px 16px;
+    cursor:pointer;
+  }
+  .mode-toggle button.active{
+    background: var(--brass);
+    color: #1B1300;
+    border-color: var(--brass);
+  }
 
-  .topbar{ display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--hairline); }
-  .topbar h2{ font-family:var(--font-display); font-size:18px; margin:0; }
-  .topbar button{ background:var(--brass); color:#1B1300; border:none; border-radius:999px; padding:8px 16px; font-family:var(--font-display); font-weight:700; font-size:13px; cursor:pointer; }
-  .back-btn{ background:transparent !important; color:var(--ink-dim) !important; font-size:13px; padding:8px 4px !important; }
+  /* ===== Screen chrome ===== */
+  .statusbar{
+    height: 34px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding: 0 22px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-faint);
+  }
+  .song-header{
+    padding: 4px 20px 14px;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .song-header .eyebrow{
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--sage);
+    margin-bottom: 4px;
+  }
+  .song-header h1{
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 600;
+    margin: 0 0 2px;
+    letter-spacing: -0.01em;
+  }
+  .song-header .artist{
+    color: var(--ink-dim);
+    font-size: 13px;
+  }
+  .song-header .meta-row{
+    display:flex;
+    gap:10px;
+    margin-top:10px;
+    align-items:center;
+  }
 
-  .library{ padding: 16px 20px 90px; }
-  .empty-state{ text-align:center; color:var(--ink-faint); padding: 60px 20px; font-size:14px; line-height:1.6; }
-  .song-card{ background:var(--bg-raised); border:1px solid var(--hairline); border-radius:var(--radius); padding:14px 16px; margin-bottom:10px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; }
-  .song-card h3{ font-family:var(--font-display); font-size:15px; margin:0 0 3px; }
-  .song-card p{ color:var(--ink-faint); font-size:12px; margin:0; font-family:var(--font-mono); }
-  .song-card .del{ color:var(--danger); font-size:18px; padding:6px; }
+  .screen-body{
+    height: 100%;
+    overflow-y: auto;
+    padding: 18px 20px 100px;
+    position: relative;
+  }
+  .screen-body::-webkit-scrollbar{ width: 3px; }
+  .screen-body::-webkit-scrollbar-thumb{ background: var(--hairline); }
 
+  .section-label{
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--sage);
+    margin: 22px 0 10px;
+  }
+  .section-label:first-child{ margin-top: 4px; }
+
+  .lyric-line{
+    font-size: 17px;
+    line-height: 1.85;
+    color: var(--ink);
+  }
+
+  .chord-line{
+    display:flex;
+    flex-wrap:wrap;
+    margin-bottom: 26px;
+  }
+  .chunk{
+    position: relative;
+    padding-top: 22px;
+    font-size: 17px;
+    line-height: 1.4;
+    white-space: pre;
+  }
+  .chunk .chord{
+    position:absolute;
+    top:0;
+    left:0;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--brass);
+  }
+
+  .transpose-bar{
+    position:absolute;
+    bottom: 18px;
+    left: 20px;
+    right: 20px;
+    background: var(--bg-panel);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    backdrop-filter: blur(6px);
+  }
+  .transpose-bar .label{
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .transpose-controls{
+    display:flex;
+    align-items:center;
+    gap:14px;
+  }
+  .transpose-controls button{
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 1px solid var(--hairline);
+    background: var(--bg-raised);
+    color: var(--ink);
+    font-size: 16px;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .transpose-controls button:active{ background: var(--brass); color:#1B1300; }
+  .transpose-value{
+    font-family: var(--font-mono);
+    font-size: 15px;
+    font-weight: 600;
+    min-width: 34px;
+    text-align:center;
+  }
+
+  .staff-scale-outer{
+    width: 100%;
+    overflow: hidden;
+    position: relative;
+  }
+  .staff-wrap{
+    display: inline-block;
+    background: var(--paper-bg);
+    border-radius: 10px;
+    padding: 20px 8px 14px;
+    box-shadow: 0 8px 24px -8px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(0,0,0,0.06);
+    transform-origin: top left;
+  }
+  .staff-system{
+    margin-bottom: 4px;
+  }
+  .staff-legend{
+    display:flex;
+    flex-wrap:wrap;
+    gap:14px;
+    margin-top: 12px;
+    padding: 0 4px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--ink-faint);
+  }
+  .staff-legend span{ display:flex; align-items:center; gap:5px; }
+
+  .format-selector{
+    display:flex;
+    flex-wrap: wrap;
+    gap:6px;
+    margin-top: 12px;
+  }
+  .format-selector button{
+    font-family: var(--font-mono);
+    font-size: 11px;
+    background: var(--bg-raised);
+    color: var(--ink-dim);
+    border: 1px solid var(--hairline);
+    border-radius: 999px;
+    padding: 6px 12px;
+    cursor:pointer;
+    white-space: nowrap;
+  }
+  .format-selector button.active{
+    background: var(--brass);
+    color: #1B1300;
+    border-color: var(--brass);
+  }
+
+  /* Tela Adicionar / Enviar Áudio */
   .add-screen{ padding: 26px 20px 100px; }
-  .add-screen .eyebrow{ font-family:var(--font-mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--sage); margin-bottom:6px; }
-  .add-screen h1{ font-family:var(--font-display); font-size:24px; margin:0 0 6px; }
-  .add-screen p.sub{ color:var(--ink-dim); font-size:13.5px; line-height:1.5; margin:0 0 26px; }
-  .link-field{ display:flex; align-items:center; gap:10px; background:var(--bg-raised); border:1px solid var(--hairline); border-radius:var(--radius); padding:14px 16px; margin-bottom:14px; }
-  .link-field input{ flex:1; background:transparent; border:none; outline:none; color:var(--ink); font-family:var(--font-body); font-size:14px; }
-  .link-field input::placeholder{ color:var(--ink-faint); }
-  .generate-btn{ width:100%; background:var(--brass); color:#1B1300; border:none; border-radius:var(--radius); padding:15px; font-family:var(--font-display); font-weight:700; font-size:14.5px; cursor:pointer; }
-  .generate-btn:disabled{ opacity:.6; cursor:default; }
-  .process-note{ margin-top:22px; font-family:var(--font-mono); font-size:12.5px; color:var(--ink-dim); display:flex; align-items:center; gap:10px; }
-  .spinner{ width:16px; height:16px; border:2px solid var(--hairline); border-top-color:var(--brass); border-radius:50%; animation:spin .8s linear infinite; }
-  @keyframes spin{ to{ transform:rotate(360deg); } }
-  .error-box{ margin-top:18px; background:rgba(217,105,95,.1); border:1px solid rgba(217,105,95,.4); color:var(--danger); border-radius:10px; padding:12px 14px; font-size:13px; }
-
-  .song-header{ padding:16px 20px 14px; border-bottom:1px solid var(--hairline); }
-  .song-header h1{ font-family:var(--font-display); font-size:21px; font-weight:600; margin:0 0 2px; }
-  .song-header .artist{ color:var(--ink-dim); font-size:13px; }
-  .song-header .meta{ font-family:var(--font-mono); font-size:11.5px; color:var(--ink-faint); margin-top:6px; }
-  .format-selector{ display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
-  .format-selector button{ font-family:var(--font-mono); font-size:11px; background:var(--bg-raised); color:var(--ink-dim); border:1px solid var(--hairline); border-radius:999px; padding:6px 12px; cursor:pointer; white-space:nowrap; }
-  .format-selector button.active{ background:var(--brass); color:#1B1300; border-color:var(--brass); }
-
-  .panes-wrap{ display:flex; }
-  @media (max-width: 640px){ .panes-wrap{ flex-direction:column !important; } }
-  .split-pane{ flex:1; min-width:0; min-height:0; display:flex; flex-direction:column; }
-  .pane-label{ font-family:var(--font-mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint); padding:10px 20px 0; }
-  .screen-body{ padding:18px 20px 110px; overflow-y:auto; }
-
-  .section-label{ font-family:var(--font-mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--sage); margin:22px 0 10px; }
-  .section-label:first-child{ margin-top:4px; }
-  .lyric-line{ font-size:17px; line-height:1.85; }
-
-  .chord-line{ display:flex; flex-wrap:wrap; margin-bottom:26px; }
-  .chunk{ position:relative; padding-top:22px; font-size:17px; line-height:1.4; white-space:pre; }
-  .chunk .chord{ position:absolute; top:0; left:0; font-family:var(--font-mono); font-weight:600; font-size:13px; color:var(--brass); }
-
-  .transpose-bar{ position:fixed; bottom:14px; left:50%; transform:translateX(-50%); width:calc(100% - 40px); max-width:680px; background:var(--bg-panel); border:1px solid var(--hairline); border-radius:var(--radius); padding:10px 14px; display:flex; align-items:center; justify-content:space-between; }
-  .transpose-bar .label{ font-family:var(--font-mono); font-size:11px; color:var(--ink-faint); text-transform:uppercase; }
-  .transpose-controls{ display:flex; align-items:center; gap:14px; }
-  .transpose-controls button{ width:30px; height:30px; border-radius:50%; border:1px solid var(--hairline); background:var(--bg-raised); color:var(--ink); font-size:16px; cursor:pointer; }
-  .transpose-value{ font-family:var(--font-mono); font-size:15px; font-weight:600; min-width:34px; text-align:center; }
-
-  .staff-scale-outer{ width:100%; overflow:hidden; position:relative; }
-  .staff-wrap{ display:inline-block; background:var(--paper-bg); border-radius:10px; padding:20px 8px 14px; box-shadow:0 8px 24px -8px rgba(0,0,0,.45), inset 0 0 0 1px rgba(0,0,0,.06); transform-origin: top left; }
-  .staff-system{ margin-bottom:4px; }
-  .staff-legend{ display:flex; flex-wrap:wrap; gap:14px; margin-top:12px; font-family:var(--font-mono); font-size:10px; color:var(--ink-faint); }
-
-  .print-btn{ background:var(--bg-raised) !important; color:var(--sage) !important; border:1px solid var(--hairline) !important; font-size:12px !important; padding:8px 12px !important; }
-  .print-btn:disabled{ opacity:.6; }
-
-  .login-screen{ min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:32px; }
-  .login-title{ font-family:var(--font-display); font-size:32px; font-weight:700; margin-bottom:10px; }
-  .login-sub{ color:var(--ink-dim); font-size:14px; line-height:1.6; max-width:320px; margin-bottom:28px; }
-  .google-btn{ background:#fff; color:#1F1F1F; border:none; border-radius:999px; padding:13px 26px; font-family:var(--font-body); font-weight:600; font-size:14.5px; cursor:pointer; }
+  .add-screen .eyebrow{
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--sage);
+    margin-bottom: 6px;
+  }
+  .add-screen h1{
+    font-family: var(--font-display);
+    font-size: 24px;
+    margin: 0 0 6px;
+  }
+  .add-screen p.sub{
+    color: var(--ink-dim);
+    font-size: 13.5px;
+    line-height: 1.5;
+    margin: 0 0 26px;
+  }
+  .file-drop-box{
+    background: var(--bg-raised);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius);
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .file-drop-box span {
+    font-size: 13px;
+    color: var(--ink-dim);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 220px;
+  }
+  .file-drop-box button{
+    background: transparent;
+    border: none;
+    color: var(--brass);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .generate-btn{
+    width:100%;
+    background: var(--brass);
+    color: #1B1300;
+    border: none;
+    border-radius: var(--radius);
+    padding: 15px;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 14.5px;
+    cursor:pointer;
+  }
+  .generate-btn:disabled{ opacity: 0.6; cursor:default; }
+  .error-box{
+    margin-top: 14px;
+    background: rgba(217, 105, 95, 0.15);
+    border: 1px solid var(--danger);
+    color: #ff9e96;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.4;
+  }
 </style>
 </head>
 <body>
-<div id="app"></div>
+  <div class="lab-note">Harmonia — protótipo de tela · deslize / clique para interagir</div>
+  <div class="mode-toggle" id="deviceToggle">
+    <button class="active" data-mode="phone">Celular</button>
+    <button data-mode="tablet">Tablet</button>
+    <button data-mode="add">+ Nova música</button>
+  </div>
+  <div class="device" id="device"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script>
-const firebaseConfig = {
-  apiKey: "AIzaSyCCLBxr2O3trO9wSPD3xKk3J30cwoZEaHQ",
-  authDomain: "harmonia-lite.firebaseapp.com",
-  projectId: "harmonia-lite",
-  storageBucket: "harmonia-lite.firebasestorage.app",
-  messagingSenderId: "932307227066",
-  appId: "1:932307227066:web:650e5b374c61e1f4014d83"
+let SONG = {
+  title: "Deixa a Luz Entrar",
+  artist: "Demonstração",
+  originalKey: "G",
+  bpm: 92,
+  lyricSections: [
+    { label: "Verso 1", lines: ["Deixa a luz entrar pela janela", "O dia começa e eu começo nela"] },
+    { label: "Refrão", lines: ["E se o mundo cansa, eu vou de novo"] }
+  ],
+  chordLines: [
+    [ {chord:"G", text:"Deixa a "}, {chord:"Em", text:"luz entrar"} ],
+    [ {chord:"C", text:"E se o mundo "}, {chord:"D", text:"cansa"} ]
+  ],
+  measures: [
+    {chord:"G", section:null, cue:null, doubleBarAfter:false},
+    {chord:"Em", section:null, cue:null, doubleBarAfter:true},
+    {chord:"C", section:"Refrão", cue:null, doubleBarAfter:false},
+    {chord:"D", section:null, cue:null, doubleBarAfter:true}
+  ]
 };
-firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db = firebase.firestore();
 
-const STORAGE_KEY = "harmonia_songs_v1";
-let screen = "loading";
-let library = [];
-let activeSong = null;
-let selectedFormats = ["letra"];
 let transposeAmount = 0;
-let currentUser = null;
-let unsubscribeLibrary = null;
+let deviceMode = "phone";
+let selectedFormats = ["letra"];
+let selectedFile = null;
+let errorMessage = "";
+let isProcessing = false;
 
-function songsCollection(){
-  return db.collection("users").doc(currentUser.uid).collection("songs");
+// ================= COMPRESSÃO DE ÁUDIO NO NAVEGADOR =================
+async function comprimirAudioAntesDoEnvio(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+  const targetSampleRate = 16000;
+  const numChannels = 1; // Mono reduz o tamanho drasticamente
+  const offlineCtx = new OfflineAudioContext(
+    numChannels, 
+    audioBuffer.duration * targetSampleRate, 
+    targetSampleRate
+  );
+
+  const source = offlineCtx.createBufferSource();
+  source.buffer = audioBuffer;
+  source.connect(offlineCtx.destination);
+  source.start(0);
+
+  const renderedBuffer = await offlineCtx.startRendering();
+  const wavBlob = audioBufferToWav(renderedBuffer, targetSampleRate);
+  
+  return new File([wavBlob], file.name.replace(/\.[^/.]+$/, "") + "_comprimido.wav", { type: "audio/wav" });
 }
 
-function chordLinesToFirestore(chordLines){
-  return (chordLines || []).map(line => ({ chunks: line || [] }));
-}
-function chordLinesFromFirestore(chordLines){
-  return (chordLines || []).map(line => (line && line.chunks) || []);
-}
+function audioBufferToWav(buffer, sampleRate) {
+  const numOfChan = buffer.numberOfChannels;
+  const length = buffer.length * numOfChan * 2 + 44;
+  const out = new DataView(new ArrayBuffer(length));
+  let channels = [];
+  let offset = 0;
+  let pos = 0;
 
-function attachLibraryListener(){
-  if(unsubscribeLibrary) unsubscribeLibrary();
-  unsubscribeLibrary = songsCollection()
-    .orderBy("createdAt", "desc")
-    .onSnapshot(snap => {
-      library = snap.docs.map(d => {
-        const raw = d.data();
-        return { id: d.id, ...raw, chordLines: chordLinesFromFirestore(raw.chordLines) };
-      });
-      renderApp();
-    }, err => {
-      console.error("Firestore listener error:", err);
-    });
-}
+  function writeString(str) { for (let i = 0; i < str.length; i++) { out.setUint8(pos++, str.charCodeAt(i)); } }
+  function setUint16(data) { out.setUint16(pos, data, true); pos += 2; }
+  function setUint32(data) { out.setUint32(pos, data, true); pos += 4; }
 
-auth.onAuthStateChanged(user => {
-  if(user){
-    currentUser = user;
-    attachLibraryListener();
-    if(screen === "loading" || screen === "login") screen = "library";
-  } else {
-    currentUser = null;
-    if(unsubscribeLibrary){ unsubscribeLibrary(); unsubscribeLibrary = null; }
-    library = [];
-    screen = "login";
+  writeString('RIFF'); setUint32(length - 8); writeString('WAVE');
+  writeString('fmt '); setUint32(16); setUint16(1); setUint16(numOfChan);
+  setUint32(sampleRate); setUint32(sampleRate * 2 * numOfChan);
+  setUint16(numOfChan * 2); setUint16(16);
+  writeString('data'); setUint32(length - pos - 4);
+
+  for (let i = 0; i < buffer.numberOfChannels; i++) { channels.push(buffer.getChannelData(i)); }
+  while (pos < length) {
+    for (let i = 0; i < numOfChan; i++) {
+      let sample = Math.max(-1, Math.min(1, channels[i][offset]));
+      sample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+      out.setInt16(pos, sample, true);
+      pos += 2;
+    }
+    offset++;
   }
-  renderApp();
-});
+  return new Blob([out.buffer], { type: 'audio/wav' });
+}
 
-let authError = null;
-
-auth.getRedirectResult().catch(err => {
-  authError = err.code ? `${err.code} — ${err.message}` : String(err.message || err);
-  screen = "login";
-  renderApp();
-});
-
-const CHROMATIC = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+// ================= RENDERIZADORES =================
 function transposeChord(chord, semitones){
   if(!chord) return chord;
+  const CHROMATIC = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
   const m = chord.match(/^([A-G]#?)(.*)$/);
   if(!m) return chord;
   const [ , root, suffix ] = m;
@@ -177,102 +446,178 @@ function transposeChord(chord, semitones){
   if(idx === -1) return chord;
   return CHROMATIC[(idx + semitones + 120) % 12] + suffix;
 }
-function currentKeyLabel(){ return activeSong ? transposeChord(activeSong.originalKey, transposeAmount) : ""; }
 
 function renderLetra(){
   let html = "";
-  (activeSong.lyricSections || []).forEach(sec => {
-    html += `<div class="section-label">${escapeHtml(sec.label)}</div>`;
-    (sec.lines || []).forEach(l => html += `<div class="lyric-line">${escapeHtml(l)}</div>`);
+  SONG.lyricSections.forEach(sec => {
+    html += `<div class="section-label">${sec.label}</div>`;
+    sec.lines.forEach(l => { html += `<div class="lyric-line">${l}</div>`; });
   });
-  return html || "<p style='color:var(--ink-faint)'>Sem letra disponível.</p>";
+  return html;
 }
+
 function renderCifra(){
   let html = "";
-  (activeSong.chordLines || []).forEach(line => {
+  SONG.chordLines.forEach(line => {
     html += `<div class="chord-line">`;
     line.forEach(chunk => {
       const shown = transposeChord(chunk.chord, transposeAmount);
-      html += `<span class="chunk"><span class="chord">${escapeHtml(shown||"")}</span>${escapeHtml(chunk.text || " ")}</span>`;
+      html += `<span class="chunk"><span class="chord">${shown}</span>${chunk.text || "&nbsp;"}</span>`;
     });
     html += `</div>`;
   });
-  return html || "<p style='color:var(--ink-faint)'>Sem cifra disponível.</p>";
+  return html;
 }
 
-const GRADE_MPS = 4;
-function chunkMeasures(){
+function chunkMeasures(measuresPerSystem){
   const out = [];
-  const list = activeSong.measures || [];
-  for(let i=0;i<list.length;i+=GRADE_MPS) out.push({ startIndex:i, items:list.slice(i,i+GRADE_MPS) });
+  for(let i=0; i<SONG.measures.length; i += measuresPerSystem){
+    out.push({ startIndex: i, items: SONG.measures.slice(i, i + measuresPerSystem) });
+  }
   return out;
 }
-function buildStaffSystemSVG(system, systemIdx){
-  const MW=96, CLEF_W=42, staffTop=26, staffBottom=62, staffMid=44;
-  const w = CLEF_W + system.items.length*MW + 14, h = 102;
-  const INK="#1E1C18", INK_DIM="#6B6A63", LINE="#8A887F", SERIF="Source Serif 4, Georgia, serif";
+
+function buildStaffSystemSVG(system, systemIdx, measuresPerSystem){
+  const MW = 96, CLEF_W = 42, staffTop = 26, staffBottom = 62, staffMid = 44;
+  const w = CLEF_W + system.items.length * MW + 14, h = 102;
+  const INK = "#1E1C18", INK_DIM = "#6B6A63", LINE = "#8A887F", SERIF = "Source Serif 4, Georgia, serif";
   let svg = `<svg viewBox="0 0 ${w} ${h}" width="100%" style="display:block; max-width:${w}px;">`;
-  for(let i=0;i<5;i++){ const y=staffTop+i*9; svg += `<line x1="${CLEF_W-6}" y1="${y}" x2="${w-6}" y2="${y}" stroke="${LINE}" stroke-width="1"/>`; }
+
+  for(let i=0;i<5;i++){
+    svg += `<line x1="${CLEF_W-6}" y1="${staffTop + i * 9}" x2="${w-6}" y2="${staffTop + i * 9}" stroke="${LINE}" stroke-width="1"/>`;
+  }
   svg += `<text x="4" y="${staffBottom+2}" font-size="40" fill="${INK}">𝄞</text>`;
   svg += `<text x="30" y="${staffTop+16}" font-size="13" fill="${INK}">♯</text>`;
-  if(systemIdx===0){
+  if(systemIdx === 0){
     svg += `<text x="30" y="${staffMid-2}" font-family="${SERIF}" font-size="12" font-weight="700" fill="${INK}">4</text>`;
     svg += `<text x="30" y="${staffMid+11}" font-family="${SERIF}" font-size="12" font-weight="700" fill="${INK}">4</text>`;
   }
   svg += `<text x="${CLEF_W-6}" y="13" font-family="${SERIF}" font-style="italic" font-size="11" fill="${INK_DIM}">${system.startIndex+1}</text>`;
   svg += `<line x1="${CLEF_W-6}" y1="${staffTop}" x2="${CLEF_W-6}" y2="${staffBottom}" stroke="${INK}" stroke-width="1.3"/>`;
-  system.items.forEach((m,i) => {
-    const x0 = CLEF_W + i*MW;
+
+  system.items.forEach((m, i) => {
+    const x0 = CLEF_W + i * MW;
     const shownChord = transposeChord(m.chord, transposeAmount);
     if(m.section){
-      const boxW = 14 + m.section.length*6.4;
+      const boxW = 14 + m.section.length * 6.4;
       svg += `<rect x="${x0+4}" y="1" width="${boxW}" height="14" fill="none" stroke="${INK}" stroke-width="1"/>`;
-      svg += `<text x="${x0+4+boxW/2}" y="11" font-family="${SERIF}" font-size="10" fill="${INK}" text-anchor="middle">${escapeHtml(m.section)}</text>`;
+      svg += `<text x="${x0+4+boxW/2}" y="11" font-family="${SERIF}" font-size="10" fill="${INK}" text-anchor="middle">${m.section}</text>`;
     }
-    svg += `<text x="${x0+8}" y="20" font-family="${SERIF}" font-weight="700" font-size="15" fill="${INK}">${escapeHtml(shownChord||"")}</text>`;
+    svg += `<text x="${x0+8}" y="20" font-family="${SERIF}" font-weight="700" font-size="15" fill="${INK}">${shownChord}</text>`;
     for(let b=0;b<4;b++){
-      const bx = x0+20+b*(MW-30)/3;
+      const bx = x0 + 20 + b * (MW-30)/3;
       svg += `<line x1="${bx-5}" y1="${staffMid+7}" x2="${bx+5}" y2="${staffMid-7}" stroke="${INK}" stroke-width="2.2" stroke-linecap="round"/>`;
     }
-    const xEnd = x0+MW;
+    const xEnd = x0 + MW;
     if(m.doubleBarAfter){
       svg += `<line x1="${xEnd-10}" y1="${staffTop}" x2="${xEnd-10}" y2="${staffBottom}" stroke="${INK}" stroke-width="1"/>`;
       svg += `<line x1="${xEnd-6}" y1="${staffTop}" x2="${xEnd-6}" y2="${staffBottom}" stroke="${INK}" stroke-width="2.4"/>`;
     } else {
       svg += `<line x1="${xEnd-6}" y1="${staffTop}" x2="${xEnd-6}" y2="${staffBottom}" stroke="${INK}" stroke-width="1"/>`;
     }
-    if(m.cue) svg += `<text x="${x0+8}" y="${staffBottom+16}" font-family="${SERIF}" font-style="italic" font-size="9" fill="${INK_DIM}">${escapeHtml(m.cue)}</text>`;
+    if(m.cue){
+      svg += `<text x="${x0+8}" y="${staffBottom+16}" font-family="${SERIF}" font-style="italic" font-size="9" fill="${INK_DIM}">${m.cue}</text>`;
+    }
   });
   svg += `</svg>`;
   return svg;
 }
+
 function renderGrade(){
-  const systems = chunkMeasures();
-  if(!systems.length) return "<p style='color:var(--ink-faint)'>Sem grade rítmica disponível.</p>";
+  const systems = chunkMeasures(4);
   let html = `<div class="staff-scale-outer"><div class="staff-wrap">`;
-  systems.forEach((sys,idx) => html += `<div class="staff-system">${buildStaffSystemSVG(sys,idx)}</div>`);
-  html += `</div></div><div class="staff-legend"><span>╱╱╱ toque no ritmo</span><span>▭ seção</span><span>itálico = cue de arranjo</span></div>`;
+  systems.forEach((sys, idx) => { html += `<div class="staff-system">${buildStaffSystemSVG(sys, idx, 4)}</div>`; });
+  html += `</div></div><div class="staff-legend"><span>╱╱╱ toque no ritmo</span><span>▭ seção</span></div>`;
   return html;
 }
+
 function fitStaffPages(){
   requestAnimationFrame(() => {
     document.querySelectorAll(".staff-scale-outer").forEach(outer => {
       const page = outer.querySelector(".staff-wrap");
       if(!page) return;
       page.style.transform = "scale(1)";
-      const naturalWidth = page.offsetWidth, naturalHeight = page.offsetHeight;
+      const naturalWidth = page.offsetWidth;
       if(!naturalWidth) return;
-      let scale = outer.clientWidth / naturalWidth;
-      scale = Math.max(0.5, Math.min(1.3, scale));
+      let scale = Math.max(0.5, Math.min(1.3, outer.clientWidth / naturalWidth));
       page.style.transform = `scale(${scale})`;
-      outer.style.height = (naturalHeight*scale) + "px";
+      outer.style.height = (page.offsetHeight * scale) + "px";
     });
   });
 }
-window.addEventListener("resize", fitStaffPages);
 
-function escapeHtml(s){
-  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function renderAddScreen(){
+  const device = document.getElementById("device");
+  device.style.width = "390px";
+  device.innerHTML = `
+    <div class="statusbar"><span>9:41</span><span>♪ Harmonia</span></div>
+    <div class="add-screen">
+      <div class="eyebrow">Nova música · IA</div>
+      <h1>Envie o áudio da música</h1>
+      <p class="sub">Selecione o ficheiro de áudio. O app comprime-o automaticamente e a IA gera a letra, cifra e grade rítmica.</p>
+      
+      <input type="file" id="audioFileInput" accept="audio/*" style="display:none" onchange="onFileSelected(event)">
+      <div class="file-drop-box">
+        <span>${selectedFile ? selectedFile.name + " (" + (selectedFile.size/(1024*1024)).toFixed(1) + "MB)" : "Nenhum ficheiro selecionado"}</span>
+        <button onclick="document.getElementById('audioFileInput').click()">Escolher</button>
+      </div>
+
+      <button class="generate-btn" onclick="startProcessing()" ${isProcessing || !selectedFile ? "disabled" : ""}>
+        ${isProcessing ? "A processar áudio..." : "Gerar cifra com IA"}
+      </button>
+
+      ${errorMessage ? `<div class="error-box">${errorMessage}</div>` : ""}
+    </div>
+  `;
+}
+
+function onFileSelected(e){
+  selectedFile = e.target.files[0];
+  errorMessage = "";
+  renderAddScreen();
+}
+
+async function startProcessing(){
+  if(!selectedFile) return;
+  isProcessing = true;
+  errorMessage = "";
+  renderAddScreen();
+
+  try {
+    // 1. Comprime no navegador
+    const arquivoComprimido = await comprimirAudioAntesDoEnvio(selectedFile);
+
+    // 2. Envia para o servidor da Vercel
+    const formData = new FormData();
+    formData.append("audio", arquivoComprimido);
+
+    const response = await fetch("/api/analisar", {
+      method: "POST",
+      body: formData
+    });
+
+    if(!response.ok) {
+      const errJson = await response.json().catch(() => ({}));
+      throw new Error(errJson.error || "Erro no servidor ao processar o áudio.");
+    }
+
+    const data = await response.json();
+    SONG = data; // Atualiza a música com os dados reais gerados pela IA!
+    
+    // Volta para o modo de exibição normal
+    deviceMode = "phone";
+    selectedFormats = ["letra"];
+    document.querySelectorAll("#deviceToggle button").forEach(b => {
+      b.classList.toggle("active", b.dataset.mode === "phone");
+    });
+    render();
+
+  } catch (err) {
+    errorMessage = err.message;
+  } finally {
+    isProcessing = false;
+    renderAddScreen();
+  }
 }
 
 const FORMAT_PRESETS = [
@@ -287,457 +632,104 @@ const FORMAT_PRESETS = [
 const PANE_LABELS = { letra:"Letra", cifra:"Cifra", grade:"Grade rítmica" };
 const PANE_RENDERERS = { letra:renderLetra, cifra:renderCifra, grade:renderGrade };
 
-function renderApp(){
-  const app = document.getElementById("app");
-  if(screen === "loading") app.innerHTML = loadingHTML();
-  else if(screen === "login") app.innerHTML = loginHTML();
-  else if(screen === "library") app.innerHTML = libraryHTML();
-  else if(screen === "add") app.innerHTML = addHTML();
-  else app.innerHTML = songHTML();
-  bindEvents();
-  if(screen === "song") fitStaffPages();
+function formatSelectorHTML(){
+  return `<div class="format-selector">${FORMAT_PRESETS.map(p => {
+    const isActive = JSON.stringify(p.formats) === JSON.stringify(selectedFormats);
+    return `<button class="${isActive ? "active" : ""}" onclick='setFormats(${JSON.stringify(p.formats)})'>${p.label}</button>`;
+  }).join("")}</div>`;
 }
 
-function loadingHTML(){
-  return `<div class="login-screen"><div class="spinner"></div></div>`;
+function setFormats(formats){
+  selectedFormats = formats;
+  render();
 }
 
-function loginHTML(){
-  return `
-    <div class="login-screen">
-      <div class="login-title">🎵 Harmonia</div>
-      <p class="login-sub">Sua biblioteca de letras, cifras e grades rítmicas, sincronizada na nuvem.</p>
-      <button class="google-btn" data-google-login="1">Entrar com Google</button>
-      ${authError ? `<div class="error-box" style="max-width:320px; margin-top:20px; text-align:left;">${escapeHtml(authError)}</div>` : ""}
+function renderPanesHTML(formats, direction){
+  const isSingle = formats.length === 1;
+  let html = `<div style="display:flex; flex-direction:${direction}; height:100%;">`;
+  formats.forEach((f, i) => {
+    const border = (i < formats.length - 1) ? (direction === "row" ? "border-right:1px solid var(--hairline);" : "border-bottom:1px solid var(--hairline);") : "";
+    html += `<div style="flex:1; min-width:0; min-height:0; ${border}">
+      ${!isSingle ? `<div style="font-family:var(--font-mono); font-size:10px; text-transform:uppercase; color:var(--ink-faint); padding:10px 20px 0;">${PANE_LABELS[f]}</div>` : ""}
+      <div class="screen-body">${PANE_RENDERERS[f]()}</div>
     </div>`;
-}
-
-function libraryHTML(){
-  const cards = library.length
-    ? library.map((s) => `
-      <div class="song-card" data-open="${s.id}">
-        <div>
-          <h3>${escapeHtml(s.title)}</h3>
-          <p>${escapeHtml(s.artist || "")} · Tom: ${escapeHtml(s.originalKey||"?")} · ${s.bpm||"?"} BPM</p>
-        </div>
-        <span class="del" data-del="${s.id}">✕</span>
-      </div>`).join("")
-    : `<div class="empty-state">Sua biblioteca está vazia.<br>Toque em "+ Nova música" e envie um arquivo de áudio.</div>`;
-  return `
-    <div class="topbar">
-      <h2>🎵 Harmonia</h2>
-      <div style="display:flex; gap:8px;">
-        <button class="print-btn" data-logout="1">Sair</button>
-        <button data-nav="add">+ Nova música</button>
-      </div>
-    </div>
-    <div class="library">${cards}</div>`;
-}
-
-let addState = "idle", addError = null, addStatusMsg = "", selectedFile = null;
-const MAX_FILE_BYTES = 3 * 1024 * 1024;
-const MAX_SELECT_BYTES = 60 * 1024 * 1024;
-
-function addHTML(){
-  const fileLabel = selectedFile ? `${selectedFile.name} (${(selectedFile.size/1e6).toFixed(1)}MB)` : "Nenhum arquivo escolhido";
-  return `
-    <div class="topbar"><button class="back-btn" data-nav="library">← Biblioteca</button></div>
-    <div class="add-screen">
-      <div class="eyebrow">Nova música · IA</div>
-      <h1>Envie o áudio da música</h1>
-      <p class="sub">Envie o arquivo de áudio (qualquer tamanho, até uns 60MB). Se for grande, o app comprime automaticamente antes de enviar. A IA ouve e gera letra, cifra e grade rítmica.</p>
-      <div class="link-field" style="cursor:pointer;" onclick="document.getElementById('fileInput').click()">
-        <span>🎵</span>
-        <span style="flex:1; color:${selectedFile?"var(--ink)":"var(--ink-faint)"}; font-size:14px;">${fileLabel}</span>
-        <span style="color:var(--brass); font-family:var(--font-mono); font-size:12px;">Escolher</span>
-      </div>
-      <input id="fileInput" type="file" accept="audio/*" style="display:none;" ${addState==="processing"?"disabled":""}/>
-      <button class="generate-btn" id="generateBtn" ${addState==="processing"?"disabled":""}>
-        ${addState==="processing" ? "Processando..." : "Gerar cifra com IA"}
-      </button>
-      ${addState==="processing" ? `<div class="process-note"><div class="spinner"></div> ${escapeHtml(addStatusMsg || "Processando...")}</div>` : ""}
-      ${addError ? `<div class="error-box">${escapeHtml(addError)}</div>` : ""}
-    </div>`;
-}
-
-function songHTML(){
-  const isSingle = selectedFormats.length === 1;
-  let panes = `<div class="panes-wrap">`;
-  selectedFormats.forEach((f,i) => {
-    const notLast = i < selectedFormats.length-1;
-    panes += `
-      <div class="split-pane" style="${notLast ? 'border-right:1px solid var(--hairline); border-bottom:1px solid var(--hairline);' : ''}">
-        ${!isSingle ? `<div class="pane-label">${PANE_LABELS[f]}</div>` : ""}
-        <div class="screen-body">${PANE_RENDERERS[f]()}</div>
-      </div>`;
   });
-  panes += `</div>`;
+  html += `</div>`;
+  return html;
+}
 
-  const showTranspose = selectedFormats.includes("cifra") || selectedFormats.includes("grade");
-
-  return `
-    <div class="topbar">
-      <button class="back-btn" data-nav="library">← Biblioteca</button>
-      <button class="print-btn" data-print="1">⬇ Baixar PDF</button>
-    </div>
+function renderPhone(){
+  const device = document.getElementById("device");
+  device.style.width = "390px";
+  const direction = selectedFormats.length > 1 ? "column" : "row";
+  device.innerHTML = `
+    <div class="statusbar"><span>9:41</span><span>♪ Harmonia</span></div>
     <div class="song-header">
-      <h1>${escapeHtml(activeSong.title)}</h1>
-      <div class="artist">${escapeHtml(activeSong.artist || "")}</div>
-      <div class="meta">Tom: ${escapeHtml(currentKeyLabel())} · ${activeSong.bpm||"?"} BPM</div>
-      <div class="format-selector">${FORMAT_PRESETS.map(p => {
-        const active = JSON.stringify(p.formats) === JSON.stringify(selectedFormats);
-        return `<button class="${active?"active":""}" data-formats='${JSON.stringify(p.formats)}'>${p.label}</button>`;
-      }).join("")}</div>
+      <div class="eyebrow">Cifra sincronizada · IA</div>
+      <h1>${SONG.title}</h1>
+      <div class="artist">${SONG.artist} · Tom: ${transposeChord(SONG.originalKey, transposeAmount)} · ${SONG.bpm} BPM</div>
+      ${formatSelectorHTML()}
     </div>
-    ${panes}
-    ${showTranspose ? `
+    <div style="height:460px;">${renderPanesHTML(selectedFormats, direction)}</div>
+    ${(selectedFormats.includes("cifra") || selectedFormats.includes("grade")) ? `
       <div class="transpose-bar">
-        <div><div class="label">Tom atual</div><div class="transpose-value">${escapeHtml(currentKeyLabel())}</div></div>
+        <div><div class="label">Tom atual</div><div class="transpose-value">${transposeChord(SONG.originalKey, transposeAmount)}</div></div>
         <div class="transpose-controls">
-          <button data-transpose="-1">−</button>
-          <div class="transpose-value">${transposeAmount>0?"+":""}${transposeAmount}</div>
-          <button data-transpose="1">+</button>
+          <button onclick="changeTranspose(-1)">−</button>
+          <div class="transpose-value">${transposeAmount > 0 ? "+"+transposeAmount : transposeAmount}</div>
+          <button onclick="changeTranspose(1)">+</button>
         </div>
       </div>` : ""}
   `;
+  fitStaffPages();
 }
 
-function bindEvents(){
-  document.querySelectorAll("[data-nav]").forEach(el => el.onclick = () => {
-    screen = el.dataset.nav;
-    if(screen === "add"){ addState="idle"; addError=null; selectedFile=null; }
-    renderApp();
-  });
-  document.querySelectorAll("[data-open]").forEach(el => el.onclick = () => {
-    activeSong = library.find(s => s.id === el.dataset.open);
-    selectedFormats = ["letra"];
-    transposeAmount = 0;
-    screen = "song";
-    renderApp();
-  });
-  document.querySelectorAll("[data-del]").forEach(el => el.onclick = (e) => {
-    e.stopPropagation();
-    songsCollection().doc(el.dataset.del).delete().catch(err => console.error(err));
-  });
-  document.querySelectorAll("[data-formats]").forEach(el => el.onclick = () => {
-    selectedFormats = JSON.parse(el.dataset.formats);
-    renderApp();
-  });
-  document.querySelectorAll("[data-transpose]").forEach(el => el.onclick = () => {
-    transposeAmount = Math.max(-6, Math.min(6, transposeAmount + Number(el.dataset.transpose)));
-    renderApp();
-  });
-  document.querySelectorAll("[data-print]").forEach(el => el.onclick = () => downloadPdf(el));
-  document.querySelectorAll("[data-google-login]").forEach(el => el.onclick = () => {
-    authError = null;
-    auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(err => {
-      authError = err.code ? `${err.code} — ${err.message}` : String(err.message || err);
-      renderApp();
-    });
-  });
-  document.querySelectorAll("[data-logout]").forEach(el => el.onclick = () => {
-    auth.signOut();
-  });
-  const fileInput = document.getElementById("fileInput");
-  if(fileInput) fileInput.onchange = (e) => {
-    const file = e.target.files[0];
-    if(!file) return;
-    if(file.size > MAX_SELECT_BYTES){
-      addError = `Esse arquivo tem ${(file.size/1e6).toFixed(1)}MB — envie algo até 60MB.`;
-      selectedFile = null;
-    } else {
-      addError = null;
-      selectedFile = file;
-    }
-    renderApp();
-  };
-  const genBtn = document.getElementById("generateBtn");
-  if(genBtn) genBtn.onclick = generateSong;
+function renderTablet(){
+  const device = document.getElementById("device");
+  device.style.width = "820px";
+  device.innerHTML = `
+    <div class="statusbar"><span>9:41</span><span>♪ Harmonia</span></div>
+    <div class="song-header">
+      <div class="eyebrow">Modo Estante</div>
+      <h1>${SONG.title}</h1>
+      <div class="artist">${SONG.artist} · Tom: ${transposeChord(SONG.originalKey, transposeAmount)} · ${SONG.bpm} BPM</div>
+      ${formatSelectorHTML()}
+    </div>
+    <div style="height:480px;">${renderPanesHTML(selectedFormats, "row")}</div>
+    ${(selectedFormats.includes("cifra") || selectedFormats.includes("grade")) ? `
+      <div class="transpose-bar">
+        <div><div class="label">Tom atual</div><div class="transpose-value">${transposeChord(SONG.originalKey, transposeAmount)}</div></div>
+        <div class="transpose-controls">
+          <button onclick="changeTranspose(-1)">−</button>
+          <div class="transpose-value">${transposeAmount > 0 ? "+"+transposeAmount : transposeAmount}</div>
+          <button onclick="changeTranspose(1)">+</button>
+        </div>
+      </div>` : ""}
+  `;
+  fitStaffPages();
 }
 
-function ensureSpace(doc, y, need, pageHeight, marginBottom, marginTop){
-  if(y + need > pageHeight - marginBottom){
-    doc.addPage();
-    return marginTop;
-  }
-  return y;
+function changeTranspose(delta){
+  transposeAmount = Math.max(-6, Math.min(6, transposeAmount + delta));
+  render();
 }
 
-function drawLetraPdf(doc, x, y, width, pageHeight, marginBottom, marginTop){
-  const sections = activeSong.lyricSections || [];
-  sections.forEach(sec => {
-    y = ensureSpace(doc, y, 20, pageHeight, marginBottom, marginTop);
-    doc.setFont("courier","bold");
-    doc.setFontSize(9);
-    doc.setTextColor(95,168,160);
-    doc.text(String(sec.label||"").toUpperCase(), x, y);
-    y += 16;
-    (sec.lines || []).forEach(line => {
-      doc.setFont("helvetica","normal");
-      doc.setFontSize(11);
-      doc.setTextColor(20,20,20);
-      const wrapped = doc.splitTextToSize(line || " ", width);
-      wrapped.forEach(wl => {
-        y = ensureSpace(doc, y, 16, pageHeight, marginBottom, marginTop);
-        doc.text(wl, x, y);
-        y += 15;
-      });
-    });
-    y += 8;
-  });
-  return y;
+function render(){
+  if(deviceMode === "phone") renderPhone();
+  else if(deviceMode === "tablet") renderTablet();
+  else renderAddScreen();
 }
 
-function drawCifraPdf(doc, x0, y, width, pageHeight, marginBottom, marginTop){
-  const lines = activeSong.chordLines || [];
-  const lineHeight = 30;
-  lines.forEach(line => {
-    y = ensureSpace(doc, y, lineHeight+6, pageHeight, marginBottom, marginTop);
-    let x = x0;
-    line.forEach(chunk => {
-      const text = chunk.text || " ";
-      const chordText = transposeChord(chunk.chord, transposeAmount) || "";
-      doc.setFont("helvetica","normal");
-      doc.setFontSize(11);
-      const textWidth = doc.getTextWidth(text);
-      if(x + textWidth > x0 + width){
-        x = x0;
-        y = ensureSpace(doc, y, lineHeight+6, pageHeight, marginBottom, marginTop);
-      }
-      if(chordText){
-        doc.setFont("courier","bold");
-        doc.setFontSize(9);
-        doc.setTextColor(184,120,15);
-        doc.text(chordText, x, y);
-      }
-      doc.setFont("helvetica","normal");
-      doc.setFontSize(11);
-      doc.setTextColor(20,20,20);
-      doc.text(text, x, y+13);
-      x += textWidth;
-    });
-    y += lineHeight;
-  });
-  return y;
-}
+document.getElementById("deviceToggle").addEventListener("click", (e) => {
+  const btn = e.target.closest("button");
+  if(!btn) return;
+  [...document.getElementById("deviceToggle").children].forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  deviceMode = btn.dataset.mode;
+  render();
+});
 
-function drawGradePdf(doc, x0, y, width, pageHeight, marginBottom, marginTop){
-  const systems = chunkMeasures();
-  if(!systems.length) return y;
-  const MW = width / 4;
-  systems.forEach(sys => {
-    y = ensureSpace(doc, y, 76, pageHeight, marginBottom, marginTop);
-    const top = y + 12, mid = top + 22, bottom = top + 40;
-    doc.setDrawColor(150,150,150);
-    doc.setLineWidth(0.5);
-    for(let i=0;i<5;i++){
-      const ly = top + i*4.5;
-      doc.line(x0, ly, x0+width, ly);
-    }
-    sys.items.forEach((m,i) => {
-      const mx = x0 + i*MW;
-      const shownChord = transposeChord(m.chord, transposeAmount) || "";
-      if(m.section){
-        doc.setFont("helvetica","bold");
-        doc.setFontSize(8);
-        doc.setTextColor(30,30,30);
-        const boxW = doc.getTextWidth(m.section)+8;
-        doc.setDrawColor(30,30,30);
-        doc.setLineWidth(0.6);
-        doc.rect(mx+2, top-13, boxW, 11);
-        doc.text(m.section, mx+6, top-5);
-      }
-      doc.setFont("helvetica","bold");
-      doc.setFontSize(11);
-      doc.setTextColor(20,20,20);
-      doc.text(shownChord, mx+4, top+9);
-      doc.setDrawColor(20,20,20);
-      doc.setLineWidth(1.2);
-      for(let b=0;b<4;b++){
-        const bx = mx + 16 + b*((MW-24)/3);
-        doc.line(bx-4, mid+6, bx+4, mid-6);
-      }
-      const xEnd = mx+MW;
-      doc.setLineWidth(m.doubleBarAfter ? 1.6 : 0.7);
-      doc.line(xEnd-2, top, xEnd-2, bottom);
-      if(m.cue){
-        doc.setFont("helvetica","italic");
-        doc.setFontSize(7);
-        doc.setTextColor(120,120,120);
-        doc.text(m.cue, mx+4, bottom+10);
-      }
-    });
-    y = bottom + 18;
-  });
-  return y;
-}
-
-async function downloadPdf(btn){
-  if(!activeSong) return;
-  const originalLabel = btn ? btn.textContent : null;
-  if(btn){ btn.textContent = "Gerando..."; btn.disabled = true; }
-  try{
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF("p","pt","a4");
-    const marginX = 42, marginTop = 50, marginBottom = 50;
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const contentWidth = pageWidth - marginX*2;
-    let y = marginTop;
-
-    doc.setFont("helvetica","bold");
-    doc.setFontSize(18);
-    doc.setTextColor(20,20,20);
-    doc.text(activeSong.title || "Sem título", marginX, y);
-    y += 22;
-    if(activeSong.artist){
-      doc.setFont("helvetica","normal");
-      doc.setFontSize(11);
-      doc.setTextColor(90,90,90);
-      doc.text(activeSong.artist, marginX, y);
-      y += 16;
-    }
-    doc.setFont("courier","normal");
-    doc.setFontSize(9);
-    doc.setTextColor(120,120,120);
-    doc.text(`Tom: ${currentKeyLabel()}  ·  ${activeSong.bpm||"?"} BPM`, marginX, y);
-    y += 26;
-
-    selectedFormats.forEach(f => {
-      if(selectedFormats.length > 1){
-        y = ensureSpace(doc, y, 30, pageHeight, marginBottom, marginTop);
-        doc.setFont("courier","bold");
-        doc.setFontSize(10);
-        doc.setTextColor(130,130,130);
-        doc.text(PANE_LABELS[f].toUpperCase(), marginX, y);
-        doc.setDrawColor(220,220,220);
-        doc.setLineWidth(0.5);
-        doc.line(marginX, y+4, pageWidth-marginX, y+4);
-        y += 22;
-      }
-      if(f === "letra") y = drawLetraPdf(doc, marginX, y, contentWidth, pageHeight, marginBottom, marginTop);
-      else if(f === "cifra") y = drawCifraPdf(doc, marginX, y, contentWidth, pageHeight, marginBottom, marginTop);
-      else if(f === "grade") y = drawGradePdf(doc, marginX, y, contentWidth, pageHeight, marginBottom, marginTop);
-      y += 14;
-    });
-
-    const safeTitle = (activeSong.title || "musica").replace(/[^a-z0-9]+/gi,"-").toLowerCase();
-    const safeFormat = selectedFormats.join("-");
-    doc.save(`${safeTitle}-${safeFormat}.pdf`);
-  } catch(err){
-    alert("Não foi possível gerar o PDF. Tente novamente.");
-  } finally{
-    if(btn){ btn.textContent = originalLabel; btn.disabled = false; }
-  }
-}
-
-async function decodeToMonoPCM(file, targetSampleRate){
-  const arrayBuffer = await file.arrayBuffer();
-  const AudioCtx = window.AudioContext || window.webkitAudioContext;
-  const tempCtx = new AudioCtx();
-  let decoded;
-  try{
-    decoded = await tempCtx.decodeAudioData(arrayBuffer);
-  } finally {
-    tempCtx.close();
-  }
-  const offlineCtx = new OfflineAudioContext(1, Math.ceil(decoded.duration * targetSampleRate) + 1, targetSampleRate);
-  const source = offlineCtx.createBufferSource();
-  source.buffer = decoded;
-  source.connect(offlineCtx.destination);
-  source.start(0);
-  const rendered = await offlineCtx.startRendering();
-  const channelData = rendered.getChannelData(0);
-  const samples = new Int16Array(channelData.length);
-  for(let i=0;i<channelData.length;i++){
-    let s = Math.max(-1, Math.min(1, channelData[i]));
-    samples[i] = s < 0 ? s*0x8000 : s*0x7FFF;
-  }
-  return samples;
-}
-
-function encodeMp3FromPCM(samples, sampleRate, kbps){
-  const mp3encoder = new lamejs.Mp3Encoder(1, sampleRate, kbps);
-  const blockSize = 1152;
-  const mp3Data = [];
-  for(let i=0;i<samples.length;i+=blockSize){
-    const chunk = samples.subarray(i, i+blockSize);
-    const mp3buf = mp3encoder.encodeBuffer(chunk);
-    if(mp3buf.length > 0) mp3Data.push(mp3buf);
-  }
-  const endBuf = mp3encoder.flush();
-  if(endBuf.length > 0) mp3Data.push(endBuf);
-  return new Blob(mp3Data, { type: "audio/mp3" });
-}
-
-async function compressAudioIfNeeded(file){
-  if(file.size <= MAX_FILE_BYTES) return { blob: file, mimeType: file.type || "audio/mpeg" };
-  const targetSampleRate = 22050;
-  const samples = await decodeToMonoPCM(file, targetSampleRate);
-  const bitrates = [64, 48, 32];
-  let lastBlob = null;
-  for(const kbps of bitrates){
-    const blob = encodeMp3FromPCM(samples, targetSampleRate, kbps);
-    lastBlob = blob;
-    if(blob.size <= MAX_FILE_BYTES){
-      return { blob, mimeType: "audio/mp3" };
-    }
-  }
-  throw new Error("Mesmo comprimido, o áudio ainda ficou grande demais (a música deve ser muito longa). Tente enviar um trecho mais curto.");
-}
-
-function fileToBase64(file){
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64 = reader.result.split(",")[1];
-      resolve(base64);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-async function generateSong(){
-  if(!selectedFile){ addError = "Escolha um arquivo de áudio antes de gerar."; renderApp(); return; }
-  addState = "processing";
-  addError = null;
-  addStatusMsg = selectedFile.size > MAX_FILE_BYTES ? "Comprimindo áudio..." : "Preparando o áudio...";
-  renderApp();
-  try{
-    const { blob, mimeType } = await compressAudioIfNeeded(selectedFile);
-    addStatusMsg = "A IA está ouvindo a música — isso roda no servidor, pode aguardar.";
-    renderApp();
-    const audioBase64 = await fileToBase64(blob);
-    const resp = await fetch("/api/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ audioBase64, mimeType }),
-    });
-    let data;
-    try{ data = await resp.json(); }
-    catch(e){ throw new Error("O servidor recusou o arquivo (muito grande). Tente um trecho mais curto da música."); }
-    if(!resp.ok) throw new Error(data.error || "Erro ao gerar a música.");
-    const docRef = await songsCollection().add({
-      ...data.song,
-      chordLines: chordLinesToFirestore(data.song.chordLines),
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    activeSong = { id: docRef.id, ...data.song };
-    selectedFormats = ["letra"];
-    transposeAmount = 0;
-    addState = "idle";
-    selectedFile = null;
-    screen = "song";
-    renderApp();
-  } catch(err){
-    addState = "idle";
-    addError = err.message || "Não foi possível gerar a música. Tente novamente.";
-    renderApp();
-  }
-}
-
-renderApp();
+render();
 </script>
 </body>
-  </html>
+</html>
