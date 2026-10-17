@@ -1,12 +1,12 @@
-import { GoogleGenAI } from "@google/genai";
+const { GoogleGenAI } = require("@google/genai");
 
-export const config = {
+module.exports.config = {
   api: {
     bodyParser: false,
   },
 };
 
-async function getRawBody(req) {
+function getRawBody(req) {
   return new Promise((resolve, reject) => {
     let buffers = [];
     req.on('data', chunk => buffers.push(chunk));
@@ -15,7 +15,7 @@ async function getRawBody(req) {
   });
 }
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -109,4 +109,4 @@ export default async function handler(req, res) {
     console.error("Erro no backend:", error);
     return res.status(500).json({ error: `Erro no servidor: ${error.message}` });
   }
-}
+};
