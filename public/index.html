@@ -69,7 +69,6 @@
   .chunk{ position:relative; padding-top:22px; font-size:17px; line-height:1.4; white-space:pre; }
   .chunk .chord{ position:absolute; top:0; left:0; font-family:var(--font-mono); font-weight:600; font-size:13px; color:var(--brass); }
 
-  /* Estilos discretos para edição direta na tela */
   .editable{ outline:none; border-bottom:1px dashed transparent; transition:border-color 0.2s, background 0.2s; }
   .editable:hover, .editable:focus{ border-bottom-color:var(--brass); background:rgba(232, 163, 61, 0.08); }
 
@@ -114,7 +113,6 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-const STORAGE_KEY = "harmonia_songs_v1";
 let screen = "loading";
 let library = [];
 let activeSong = null;
@@ -224,6 +222,22 @@ function updateChunkText(lineIdx, chunkIdx, val){
   saveActiveSongToFirebase();
 }
 
+function updateMeasureChord(mIndex, val){
+  if(!activeSong || !activeSong.measures || !activeSong.measures[mIndex]) return;
+  activeSong.measures[mIndex].chord = val.trim();
+  saveActiveSongToFirebase();
+}
+function updateMeasureSection(mIndex, val){
+  if(!activeSong || !activeSong.measures || !activeSong.measures[mIndex]) return;
+  activeSong.measures[mIndex].section = val.trim() || null;
+  saveActiveSongToFirebase();
+}
+function updateMeasureCue(mIndex, val){
+  if(!activeSong || !activeSong.measures || !activeSong.measures[mIndex]) return;
+  activeSong.measures[mIndex].cue = val.trim() || null;
+  saveActiveSongToFirebase();
+}
+
 function renderLetra(){
   let html = "";
   (activeSong.lyricSections || []).forEach((sec, sIdx) => {
@@ -270,15 +284,28 @@ function buildStaffSystemSVG(system, systemIdx){
   }
   svg += `<text x="${CLEF_W-6}" y="13" font-family="${SERIF}" font-style="italic" font-size="11" fill="${INK_DIM}">${system.startIndex+1}</text>`;
   svg += `<line x1="${CLEF_W-6}" y1="${staffTop}" x2="${CLEF_W-6}" y2="${staffBottom}" stroke="${INK}" stroke-width="1.3"/>`;
+  
   system.items.forEach((m,i) => {
     const x0 = CLEF_W + i*MW;
+    const globalIdx = system.startIndex + i;
     const shownChord = transposeChord(m.chord, transposeAmount);
-    if(m.section){
-      const boxW = 14 + m.section.length*6.4;
+
+    if(m.section !== undefined && m.section !== null){
+      const boxW = Math.max(24, 14 + String(m.section).length*6.4);
       svg += `<rect x="${x0+4}" y="1" width="${boxW}" height="14" fill="none" stroke="${INK}" stroke-width="1"/>`;
-      svg += `<text x="${x0+4+boxW/2}" y="11" font-family="${SERIF}" font-size="10" fill="${INK}" text-anchor="middle">${escapeHtml(m.section)}</text>`;
+      svg += `<foreignObject x="${x0+4}" y="1" width="${boxW}" height="14">
+        <body xmlns="http://www.w3.org/1999/xhtml" style="margin:0;background:transparent;overflow:hidden;">
+          <div contenteditable="true" onblur="updateMeasureSection(${globalIdx}, this.innerText)" style="font-family:Source Serif 4, Georgia, serif; font-size:10px; color:${INK}; text-align:center; outline:none; white-space:nowrap;">${escapeHtml(m.section)}</div>
+        </body>
+      </foreignObject>`;
     }
-    svg += `<text x="${x0+8}" y="20" font-family="${SERIF}" font-weight="700" font-size="15" fill="${INK}">${escapeHtml(shownChord||"")}</text>`;
+
+    svg += `<foreignObject x="${x0+8}" y="6" width="${MW-12}" height="18">
+      <body xmlns="http://www.w3.org/1999/xhtml" style="margin:0;background:transparent;overflow:hidden;">
+        <div contenteditable="true" onblur="updateMeasureChord(${globalIdx}, this.innerText)" style="font-family:Source Serif 4, Georgia, serif; font-weight:700; font-size:15px; color:${INK}; outline:none; white-space:nowrap; border-bottom:1px dashed transparent;" onfocus="this.style.borderBottomColor='#E8A33D'" onblur="this.style.borderBottomColor='transparent'">${escapeHtml(shownChord||"")}</div>
+      </body>
+    </foreignObject>`;
+
     for(let b=0;b<4;b++){
       const bx = x0+20+b*(MW-30)/3;
       svg += `<line x1="${bx-5}" y1="${staffMid+7}" x2="${bx+5}" y2="${staffMid-7}" stroke="${INK}" stroke-width="2.2" stroke-linecap="round"/>`;
@@ -290,7 +317,13 @@ function buildStaffSystemSVG(system, systemIdx){
     } else {
       svg += `<line x1="${xEnd-6}" y1="${staffTop}" x2="${xEnd-6}" y2="${staffBottom}" stroke="${INK}" stroke-width="1"/>`;
     }
-    if(m.cue) svg += `<text x="${x0+8}" y="${staffBottom+16}" font-family="${SERIF}" font-style="italic" font-size="9" fill="${INK_DIM}">${escapeHtml(m.cue)}</text>`;
+    if(m.cue){
+      svg += `<foreignObject x="${x0+8}" y="${staffBottom+6}" width="${MW-12}" height="14">
+        <body xmlns="http://www.w3.org/1999/xhtml" style="margin:0;background:transparent;overflow:hidden;">
+          <div contenteditable="true" onblur="updateMeasureCue(${globalIdx}, this.innerText)" style="font-family:Source Serif 4, Georgia, serif; font-style:italic; font-size:9px; color:${INK_DIM}; outline:none; white-space:nowrap;">${escapeHtml(m.cue)}</div>
+        </body>
+      </foreignObject>`;
+    }
   });
   svg += `</svg>`;
   return svg;
