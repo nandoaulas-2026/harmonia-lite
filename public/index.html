@@ -127,7 +127,7 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 
 let screen = "loading";
-let libraryTab = "songs"; // 'songs' ou 'playlists'
+let libraryTab = "songs";
 let library = [];
 let playlists = [];
 let activePlaylist = null;
@@ -510,7 +510,6 @@ function songHTML(){
   `;
 }
 
-// Gestos de Deslize (Swipe)
 let touchStartX = 0;
 let touchEndX = 0;
 
@@ -568,20 +567,28 @@ function bindEvents(){
     e.stopPropagation();
     playlistsCollection().doc(el.dataset.delPlaylist).delete().catch(err => console.error(err));
   });
-  document.querySelectorAll("[data-create-playlist]").forEach(el => el.onclick = () => {
+  document.querySelectorAll("[data-create-playlist]").forEach(el => el.onclick = async () => {
     const title = prompt("Digite o nome da nova pasta / playlist de show:");
     if(!title || !title.trim()) return;
     
-    if(!library.length) {
+    if(!library || !library.length) {
       alert("Adicione músicas à sua biblioteca primeiro!");
       return;
     }
-    const selectedIds = library.map(s => s.id);
-    playlistsCollection().add({
-      title: title.trim(),
-      songIds: selectedIds,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+
+    try {
+      const selectedIds = library.map(s => s.id);
+      await playlistsCollection().add({
+        title: title.trim(),
+        songIds: selectedIds,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      libraryTab = "playlists";
+      renderApp();
+    } catch(err) {
+      console.error("Erro ao criar playlist:", err);
+      alert("Ocorreu um erro ao criar a playlist. Tente novamente.");
+    }
   });
   document.querySelectorAll("[data-start-playlist]").forEach(el => el.onclick = () => {
     const p = playlists.find(x => x.id === el.dataset.startPlaylist);
