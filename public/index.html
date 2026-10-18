@@ -69,6 +69,10 @@
   .chunk{ position:relative; padding-top:22px; font-size:17px; line-height:1.4; white-space:pre; }
   .chunk .chord{ position:absolute; top:0; left:0; font-family:var(--font-mono); font-weight:600; font-size:13px; color:var(--brass); }
 
+  /* Estilos discretos para edição direta na tela */
+  .editable{ outline:none; border-bottom:1px dashed transparent; transition:border-color 0.2s, background 0.2s; }
+  .editable:hover, .editable:focus{ border-bottom-color:var(--brass); background:rgba(232, 163, 61, 0.08); }
+
   .transpose-bar{ position:fixed; bottom:14px; left:50%; transform:translateX(-50%); width:calc(100% - 40px); max-width:680px; background:var(--bg-panel); border:1px solid var(--hairline); border-radius:var(--radius); padding:10px 14px; display:flex; align-items:center; justify-content:space-between; }
   .transpose-bar .label{ font-family:var(--font-mono); font-size:11px; color:var(--ink-faint); text-transform:uppercase; }
   .transpose-controls{ display:flex; align-items:center; gap:14px; }
@@ -130,12 +134,21 @@ function chordLinesFromFirestore(chordLines){
   return (chordLines || []).map(line => (line && line.chunks) || []);
 }
 
+function saveActiveSongToFirebase(){
+  if(!activeSong || !activeSong.id || !currentUser) return;
+  const payload = {
+    ...activeSong,
+    chordLines: chordLinesToFirestore(activeSong.chordLines)
+  };
+  delete payload.id;
+  songsCollection().doc(activeSong.id).update(payload).catch(err => console.error("Erro ao atualizar música:", err));
+}
+
 function attachLibraryListener(){
   if(unsubscribeLibrary) unsubscribeLibrary();
   unsubscribeLibrary = songsCollection()
     .orderBy("createdAt", "desc")
     .onSnapshot(snap => {
-      library = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       library = snap.docs.map(d => {
         const raw = d.data();
         return { id: d.id, ...raw, chordLines: chordLinesFromFirestore(raw.chordLines) };
@@ -180,21 +193,55 @@ function transposeChord(chord, semitones){
 }
 function currentKeyLabel(){ return activeSong ? transposeChord(activeSong.originalKey, transposeAmount) : ""; }
 
+function updateTitle(val){
+  if(!activeSong) return;
+  activeSong.title = val.trim();
+  saveActiveSongToFirebase();
+}
+function updateArtist(val){
+  if(!activeSong) return;
+  activeSong.artist = val.trim();
+  saveActiveSongToFirebase();
+}
+function updateLyricSectionLabel(sIdx, val){
+  if(!activeSong || !activeSong.lyricSections[sIdx]) return;
+  activeSong.lyricSections[sIdx].label = val.trim();
+  saveActiveSongToFirebase();
+}
+function updateLyricLine(sIdx, lIdx, val){
+  if(!activeSong || !activeSong.lyricSections[sIdx]) return;
+  activeSong.lyricSections[sIdx].lines[lIdx] = val;
+  saveActiveSongToFirebase();
+}
+function updateChord(lineIdx, chunkIdx, val){
+  if(!activeSong || !activeSong.chordLines[lineIdx]) return;
+  activeSong.chordLines[lineIdx][chunkIdx].chord = val.trim();
+  saveActiveSongToFirebase();
+}
+function updateChunkText(lineIdx, chunkIdx, val){
+  if(!activeSong || !activeSong.chordLines[lineIdx]) return;
+  activeSong.chordLines[lineIdx][chunkIdx].text = val;
+  saveActiveSongToFirebase();
+}
+
 function renderLetra(){
   let html = "";
-  (activeSong.lyricSections || []).forEach(sec => {
-    html += `<div class="section-label">${escapeHtml(sec.label)}</div>`;
-    (sec.lines || []).forEach(l => html += `<div class="lyric-line">${escapeHtml(l)}</div>`);
+  (activeSong.lyricSections || []).forEach((sec, sIdx) => {
+    html += `<div class="section-label editable" contenteditable="true" onblur="updateLyricSectionLabel(${sIdx}, this.innerText)">${escapeHtml(sec.label)}</div>`;
+    (sec.lines || []).forEach((l, lIdx) => {
+      html += `<div class="lyric-line editable" contenteditable="true" onblur="updateLyricLine(${sIdx}, ${lIdx}, this.innerText)">${escapeHtml(l)}</div>`;
+    });
   });
   return html || "<p style='color:var(--ink-faint)'>Sem letra disponível.</p>";
 }
+
 function renderCifra(){
   let html = "";
-  (activeSong.chordLines || []).forEach(line => {
+  (activeSong.chordLines || []).forEach((line, lineIdx) => {
     html += `<div class="chord-line">`;
-    line.forEach(chunk => {
+    line.forEach((chunk, chunkIdx) => {
       const shown = transposeChord(chunk.chord, transposeAmount);
-      html += `<span class="chunk"><span class="chord">${escapeHtml(shown||"")}</span>${escapeHtml(chunk.text || " ")}</span>`;
+      html += `<span class="chunk"><span class="chord editable" contenteditable="true" onblur="updateChord(${lineIdx}, ${chunkIdx}, this.innerText)">${escapeHtml(shown||"")}</span><span class="editable" contenteditable="true" onblur="updateChunkText(${lineIdx}, ${chunkIdx}, this.innerText)">${escapeHtml(chunk.text || " ")}</span></span>`;
     });
     html += `</div>`;
   });
@@ -208,6 +255,7 @@ function chunkMeasures(){
   for(let i=0;i<list.length;i+=GRADE_MPS) out.push({ startIndex:i, items:list.slice(i,i+GRADE_MPS) });
   return out;
 }
+
 function buildStaffSystemSVG(system, systemIdx){
   const MW=96, CLEF_W=42, staffTop=26, staffBottom=62, staffMid=44;
   const w = CLEF_W + system.items.length*MW + 14, h = 102;
@@ -247,6 +295,7 @@ function buildStaffSystemSVG(system, systemIdx){
   svg += `</svg>`;
   return svg;
 }
+
 function renderGrade(){
   const systems = chunkMeasures();
   if(!systems.length) return "<p style='color:var(--ink-faint)'>Sem grade rítmica disponível.</p>";
@@ -255,6 +304,7 @@ function renderGrade(){
   html += `</div></div><div class="staff-legend"><span>╱╱╱ toque no ritmo</span><span>▭ seção</span><span>itálico = cue de arranjo</span></div>`;
   return html;
 }
+
 function fitStaffPages(){
   requestAnimationFrame(() => {
     document.querySelectorAll(".staff-scale-outer").forEach(outer => {
@@ -382,8 +432,8 @@ function songHTML(){
       <button class="print-btn" data-print="1">⬇ Baixar PDF</button>
     </div>
     <div class="song-header">
-      <h1>${escapeHtml(activeSong.title)}</h1>
-      <div class="artist">${escapeHtml(activeSong.artist || "")}</div>
+      <h1 class="editable" contenteditable="true" onblur="updateTitle(this.innerText)">${escapeHtml(activeSong.title)}</h1>
+      <div class="artist editable" contenteditable="true" onblur="updateArtist(this.innerText)">${escapeHtml(activeSong.artist || "")}</div>
       <div class="meta">Tom: ${escapeHtml(currentKeyLabel())} · ${activeSong.bpm||"?"} BPM</div>
       <div class="format-selector">${FORMAT_PRESETS.map(p => {
         const active = JSON.stringify(p.formats) === JSON.stringify(selectedFormats);
@@ -700,46 +750,53 @@ function fileToBase64(file){
 }
 
 async function generateSong(){
-  if(!selectedFile){ addError = "Escolha um arquivo de áudio antes de gerar."; renderApp(); return; }
+  if(!selectedFile) return;
   addState = "processing";
   addError = null;
-  addStatusMsg = selectedFile.size > MAX_FILE_BYTES ? "Comprimindo áudio..." : "Preparando o áudio...";
+  addStatusMsg = "Comprimindo áudio...";
   renderApp();
-  try{
+
+  try {
     const { blob, mimeType } = await compressAudioIfNeeded(selectedFile);
-    addStatusMsg = "A IA está ouvindo a música — isso roda no servidor, pode aguardar.";
+    addStatusMsg = "Enviando para a IA...";
     renderApp();
-    const audioBase64 = await fileToBase64(blob);
-    const resp = await fetch("/api/generate", {
+
+    const base64 = await fileToBase64(blob);
+
+    const res = await fetch("/api/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ audioBase64, mimeType }),
+      body: JSON.stringify({ audioBase64: base64, mimeType })
     });
-    let data;
-    try{ data = await resp.json(); }
-    catch(e){ throw new Error("O servidor recusou o arquivo (muito grande). Tente um trecho mais curto da música."); }
-    if(!resp.ok) throw new Error(data.error || "Erro ao gerar a música.");
+
+    if(!res.ok){
+      const errText = await res.text();
+      throw new Error(`Erro no servidor: ${errText}`);
+    }
+
+    const newSong = await res.json();
+    addStatusMsg = "Salvando na biblioteca...";
+    renderApp();
+
     const docRef = await songsCollection().add({
-      ...data.song,
-      chordLines: chordLinesToFirestore(data.song.chordLines),
+      ...newSong,
+      chordLines: chordLinesToFirestore(newSong.chordLines),
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
-    activeSong = { id: docRef.id, ...data.song };
-    selectedFormats = ["letra"];
-    transposeAmount = 0;
+
+    activeSong = { id: docRef.id, ...newSong };
+    screen = "song";
     addState = "idle";
     selectedFile = null;
-    screen = "song";
     renderApp();
-  } catch(err){
+
+  } catch(err) {
+    console.error("Erro ao gerar música:", err);
+    addError = err.message || "Ocorreu um erro ao processar o áudio.";
     addState = "idle";
-    addError = err.message || "Não foi possível gerar a música. Tente novamente.";
     renderApp();
   }
 }
-
-renderApp();
 </script>
 </body>
 </html>
-  </html>
