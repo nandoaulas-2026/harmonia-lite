@@ -18,13 +18,17 @@
     --paper-bg: #FBFAF6; --paper-ink: #1E1C18; --paper-ink-dim: #6B6A63; --paper-line: #8A887F;
   }
   *{box-sizing:border-box;}
-  body{ margin:0; background:#0B0C0E; font-family:var(--font-body); color:var(--ink); min-height:100vh; }
-  #app{ max-width: 720px; margin: 0 auto; min-height:100vh; background:var(--bg); position:relative; }
+  body{ margin:0; background:#0B0C0E; font-family:var(--font-body); color:var(--ink); min-height:100vh; touch-action: pan-y; }
+  #app{ max-width: 720px; margin: 0 auto; min-height:100vh; background:var(--bg); position:relative; overflow:hidden; }
 
   .topbar{ display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--hairline); }
   .topbar h2{ font-family:var(--font-display); font-size:18px; margin:0; }
   .topbar button{ background:var(--brass); color:#1B1300; border:none; border-radius:999px; padding:8px 16px; font-family:var(--font-display); font-weight:700; font-size:13px; cursor:pointer; }
   .back-btn{ background:transparent !important; color:var(--ink-dim) !important; font-size:13px; padding:8px 4px !important; }
+
+  .nav-tabs{ display:flex; gap:12px; border-bottom:1px solid var(--hairline); padding:0 20px; background:var(--bg-raised); }
+  .nav-tabs button{ background:transparent; border:none; color:var(--ink-dim); font-family:var(--font-mono); font-size:12px; padding:12px 4px; cursor:pointer; border-bottom:2px solid transparent; text-transform:uppercase; }
+  .nav-tabs button.active{ color:var(--brass); border-bottom-color:var(--brass); font-weight:600; }
 
   .library{ padding: 16px 20px 90px; }
   .empty-state{ text-align:center; color:var(--ink-faint); padding: 60px 20px; font-size:14px; line-height:1.6; }
@@ -32,6 +36,11 @@
   .song-card h3{ font-family:var(--font-display); font-size:15px; margin:0 0 3px; }
   .song-card p{ color:var(--ink-faint); font-size:12px; margin:0; font-family:var(--font-mono); }
   .song-card .del{ color:var(--danger); font-size:18px; padding:6px; }
+
+  .playlist-card{ background:var(--bg-raised); border:1px solid var(--hairline); border-radius:var(--radius); padding:16px; margin-bottom:12px; }
+  .playlist-card h3{ font-family:var(--font-display); font-size:16px; margin:0 0 4px; color:var(--brass); }
+  .playlist-card p{ color:var(--ink-dim); font-size:12px; margin:0 0 12px; font-family:var(--font-mono); }
+  .playlist-actions{ display:flex; gap:8px; }
 
   .add-screen{ padding: 26px 20px 100px; }
   .add-screen .eyebrow{ font-family:var(--font-mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--sage); margin-bottom:6px; }
@@ -72,11 +81,15 @@
   .editable{ outline:none; border-bottom:1px dashed transparent; transition:border-color 0.2s, background 0.2s; }
   .editable:hover, .editable:focus{ border-bottom-color:var(--brass); background:rgba(232, 163, 61, 0.08); }
 
-  .transpose-bar{ position:fixed; bottom:14px; left:50%; transform:translateX(-50%); width:calc(100% - 40px); max-width:680px; background:var(--bg-panel); border:1px solid var(--hairline); border-radius:var(--radius); padding:10px 14px; display:flex; align-items:center; justify-content:space-between; }
+  .transpose-bar{ position:fixed; bottom:14px; left:50%; transform:translateX(-50%); width:calc(100% - 40px); max-width:680px; background:var(--bg-panel); border:1px solid var(--hairline); border-radius:var(--radius); padding:10px 14px; display:flex; align-items:center; justify-content:space-between; z-index: 10; }
   .transpose-bar .label{ font-family:var(--font-mono); font-size:11px; color:var(--ink-faint); text-transform:uppercase; }
   .transpose-controls{ display:flex; align-items:center; gap:14px; }
   .transpose-controls button{ width:30px; height:30px; border-radius:50%; border:1px solid var(--hairline); background:var(--bg-raised); color:var(--ink); font-size:16px; cursor:pointer; }
   .transpose-value{ font-family:var(--font-mono); font-size:15px; font-weight:600; min-width:34px; text-align:center; }
+
+  .player-bar{ position:fixed; bottom:0; left:0; width:100%; background:var(--bg-panel); border-top:1px solid var(--hairline); padding:12px 20px; display:flex; align-items:center; justify-content:space-between; z-index: 20; }
+  .player-bar button{ background:var(--bg-raised); color:var(--ink); border:1px solid var(--hairline); border-radius:8px; padding:8px 16px; font-family:var(--font-mono); font-size:12px; cursor:pointer; }
+  .player-bar .indicator{ font-family:var(--font-mono); font-size:12px; color:var(--brass); }
 
   .staff-scale-outer{ width:100%; overflow:hidden; position:relative; }
   .staff-wrap{ display:inline-block; background:var(--paper-bg); border-radius:10px; padding:20px 8px 14px; box-shadow:0 8px 24px -8px rgba(0,0,0,.45), inset 0 0 0 1px rgba(0,0,0,.06); transform-origin: top left; }
@@ -114,15 +127,24 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 
 let screen = "loading";
+let libraryTab = "songs"; // 'songs' ou 'playlists'
 let library = [];
+let playlists = [];
+let activePlaylist = null;
+let activePlaylistIndex = 0;
 let activeSong = null;
 let selectedFormats = ["letra"];
 let transposeAmount = 0;
 let currentUser = null;
 let unsubscribeLibrary = null;
+let unsubscribePlaylists = null;
 
 function songsCollection(){
   return db.collection("users").doc(currentUser.uid).collection("songs");
+}
+
+function playlistsCollection(){
+  return db.collection("users").doc(currentUser.uid).collection("playlists");
 }
 
 function chordLinesToFirestore(chordLines){
@@ -155,6 +177,14 @@ function attachLibraryListener(){
     }, err => {
       console.error("Firestore listener error:", err);
     });
+
+  if(unsubscribePlaylists) unsubscribePlaylists();
+  unsubscribePlaylists = playlistsCollection()
+    .orderBy("createdAt", "desc")
+    .onSnapshot(snap => {
+      playlists = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderApp();
+    }, err => console.error("Firestore playlists error:", err));
 }
 
 auth.onAuthStateChanged(user => {
@@ -165,7 +195,9 @@ auth.onAuthStateChanged(user => {
   } else {
     currentUser = null;
     if(unsubscribeLibrary){ unsubscribeLibrary(); unsubscribeLibrary = null; }
+    if(unsubscribePlaylists){ unsubscribePlaylists(); unsubscribePlaylists = null; }
     library = [];
+    playlists = [];
     screen = "login";
   }
   renderApp();
@@ -191,52 +223,16 @@ function transposeChord(chord, semitones){
 }
 function currentKeyLabel(){ return activeSong ? transposeChord(activeSong.originalKey, transposeAmount) : ""; }
 
-function updateTitle(val){
-  if(!activeSong) return;
-  activeSong.title = val.trim();
-  saveActiveSongToFirebase();
-}
-function updateArtist(val){
-  if(!activeSong) return;
-  activeSong.artist = val.trim();
-  saveActiveSongToFirebase();
-}
-function updateLyricSectionLabel(sIdx, val){
-  if(!activeSong || !activeSong.lyricSections[sIdx]) return;
-  activeSong.lyricSections[sIdx].label = val.trim();
-  saveActiveSongToFirebase();
-}
-function updateLyricLine(sIdx, lIdx, val){
-  if(!activeSong || !activeSong.lyricSections[sIdx]) return;
-  activeSong.lyricSections[sIdx].lines[lIdx] = val;
-  saveActiveSongToFirebase();
-}
-function updateChord(lineIdx, chunkIdx, val){
-  if(!activeSong || !activeSong.chordLines[lineIdx]) return;
-  activeSong.chordLines[lineIdx][chunkIdx].chord = val.trim();
-  saveActiveSongToFirebase();
-}
-function updateChunkText(lineIdx, chunkIdx, val){
-  if(!activeSong || !activeSong.chordLines[lineIdx]) return;
-  activeSong.chordLines[lineIdx][chunkIdx].text = val;
-  saveActiveSongToFirebase();
-}
+function updateTitle(val){ if(!activeSong) return; activeSong.title = val.trim(); saveActiveSongToFirebase(); }
+function updateArtist(val){ if(!activeSong) return; activeSong.artist = val.trim(); saveActiveSongToFirebase(); }
+function updateLyricSectionLabel(sIdx, val){ if(!activeSong || !activeSong.lyricSections[sIdx]) return; activeSong.lyricSections[sIdx].label = val.trim(); saveActiveSongToFirebase(); }
+function updateLyricLine(sIdx, lIdx, val){ if(!activeSong || !activeSong.lyricSections[sIdx]) return; activeSong.lyricSections[sIdx].lines[lIdx] = val; saveActiveSongToFirebase(); }
+function updateChord(lineIdx, chunkIdx, val){ if(!activeSong || !activeSong.chordLines[lineIdx]) return; activeSong.chordLines[lineIdx][chunkIdx].chord = val.trim(); saveActiveSongToFirebase(); }
+function updateChunkText(lineIdx, chunkIdx, val){ if(!activeSong || !activeSong.chordLines[lineIdx]) return; activeSong.chordLines[lineIdx][chunkIdx].text = val; saveActiveSongToFirebase(); }
 
-function updateMeasureChord(mIndex, val){
-  if(!activeSong || !activeSong.measures || !activeSong.measures[mIndex]) return;
-  activeSong.measures[mIndex].chord = val.trim();
-  saveActiveSongToFirebase();
-}
-function updateMeasureSection(mIndex, val){
-  if(!activeSong || !activeSong.measures || !activeSong.measures[mIndex]) return;
-  activeSong.measures[mIndex].section = val.trim() || null;
-  saveActiveSongToFirebase();
-}
-function updateMeasureCue(mIndex, val){
-  if(!activeSong || !activeSong.measures || !activeSong.measures[mIndex]) return;
-  activeSong.measures[mIndex].cue = val.trim() || null;
-  saveActiveSongToFirebase();
-}
+function updateMeasureChord(mIndex, val){ if(!activeSong || !activeSong.measures || !activeSong.measures[mIndex]) return; activeSong.measures[mIndex].chord = val.trim(); saveActiveSongToFirebase(); }
+function updateMeasureSection(mIndex, val){ if(!activeSong || !activeSong.measures || !activeSong.measures[mIndex]) return; activeSong.measures[mIndex].section = val.trim() || null; saveActiveSongToFirebase(); }
+function updateMeasureCue(mIndex, val){ if(!activeSong || !activeSong.measures || !activeSong.measures[mIndex]) return; activeSong.measures[mIndex].cue = val.trim() || null; saveActiveSongToFirebase(); }
 
 function renderLetra(){
   let html = "";
@@ -397,23 +393,44 @@ function loginHTML(){
 }
 
 function libraryHTML(){
-  const cards = library.length
-    ? library.map((s) => `
-      <div class="song-card" data-open="${s.id}">
-        <div>
-          <h3>${escapeHtml(s.title)}</h3>
-          <p>${escapeHtml(s.artist || "")} · Tom: ${escapeHtml(s.originalKey||"?")} · ${s.bpm||"?"} BPM</p>
-        </div>
-        <span class="del" data-del="${s.id}">✕</span>
-      </div>`).join("")
-    : `<div class="empty-state">Sua biblioteca está vazia.<br>Toque em "+ Nova música" e envie um arquivo de áudio.</div>`;
+  const isSongs = libraryTab === "songs";
+  const cards = isSongs
+    ? (library.length
+        ? library.map((s) => `
+          <div class="song-card" data-open="${s.id}">
+            <div>
+              <h3>${escapeHtml(s.title)}</h3>
+              <p>${escapeHtml(s.artist || "")} · Tom: ${escapeHtml(s.originalKey||"?")} · ${s.bpm||"?"} BPM</p>
+            </div>
+            <span class="del" data-del-song="${s.id}">✕</span>
+          </div>`).join("")
+        : `<div class="empty-state">Sua biblioteca está vazia.<br>Toque em "+ Nova música" e envie um arquivo de áudio.</div>`)
+    : (playlists.length
+        ? playlists.map((p) => `
+          <div class="playlist-card">
+            <h3>📂 ${escapeHtml(p.title)}</h3>
+            <p>${(p.songIds || []).length} música(s) no repertório</p>
+            <div class="playlist-actions">
+              <button class="print-btn" data-start-playlist="${p.id}">▶ Iniciar Show (Leitor)</button>
+              <button class="print-btn" data-del-playlist="${p.id}" style="color:var(--danger) !important;">Excluir</button>
+            </div>
+          </div>`).join("")
+        : `<div class="empty-state">Nenhuma pasta de show criada.<br>Toque em "+ Nova Playlist" para organizar seu show.</div>`);
+
   return `
     <div class="topbar">
       <h2>🎵 Harmonia</h2>
       <div style="display:flex; gap:8px;">
         <button class="print-btn" data-logout="1">Sair</button>
-        <button data-nav="add">+ Nova música</button>
+        ${isSongs 
+          ? `<button data-nav="add">+ Nova música</button>` 
+          : `<button data-create-playlist="1">+ Nova Playlist</button>`
+        }
       </div>
+    </div>
+    <div class="nav-tabs">
+      <button class="${isSongs ? 'active' : ''}" data-tab="songs">Músicas</button>
+      <button class="${!isSongs ? 'active' : ''}" data-tab="playlists">Playlists / Shows</button>
     </div>
     <div class="library">${cards}</div>`;
 }
@@ -458,10 +475,11 @@ function songHTML(){
   panes += `</div>`;
 
   const showTranspose = selectedFormats.includes("cifra") || selectedFormats.includes("grade");
+  const isPlayerMode = activePlaylist !== null;
 
   return `
     <div class="topbar">
-      <button class="back-btn" data-nav="library">← Biblioteca</button>
+      <button class="back-btn" data-nav="library">← ${isPlayerMode ? 'Sair do Show' : 'Biblioteca'}</button>
       <button class="print-btn" data-print="1">⬇ Baixar PDF</button>
     </div>
     <div class="song-header">
@@ -475,7 +493,7 @@ function songHTML(){
     </div>
     ${panes}
     ${showTranspose ? `
-      <div class="transpose-bar">
+      <div class="transpose-bar" style="${isPlayerMode ? 'bottom:60px;' : ''}">
         <div><div class="label">Tom atual</div><div class="transpose-value">${escapeHtml(currentKeyLabel())}</div></div>
         <div class="transpose-controls">
           <button data-transpose="-1">−</button>
@@ -483,26 +501,105 @@ function songHTML(){
           <button data-transpose="1">+</button>
         </div>
       </div>` : ""}
+    ${isPlayerMode ? `
+      <div class="player-bar">
+        <button data-playlist-prev="1">◀ Anterior</button>
+        <span class="indicator">Música ${activePlaylistIndex + 1} de${activePlaylist.songIds.length}</span>
+        <button data-playlist-next="1">Próxima ▶</button>
+      </div>` : ""}
   `;
 }
 
+// Gestos de Deslize (Swipe)
+let touchStartX = 0;
+let touchEndX = 0;
+
+function handleTouchStart(e) { touchStartX = e.changedTouches[0].screenX; }
+function handleTouchEnd(e) {
+  touchEndX = e.changedTouches[0].screenX;
+  if(!activePlaylist) return;
+  const diff = touchStartX - touchEndX;
+  if (Math.abs(diff) > 50) {
+    if (diff > 0) changePlaylistSong(1);
+    else changePlaylistSong(-1);
+  }
+}
+
+function changePlaylistSong(delta) {
+  if(!activePlaylist) return;
+  const newIndex = activePlaylistIndex + delta;
+  if(newIndex >= 0 && newIndex < activePlaylist.songIds.length) {
+    activePlaylistIndex = newIndex;
+    const songId = activePlaylist.songIds[activePlaylistIndex];
+    activeSong = library.find(s => s.id === songId);
+    transposeAmount = 0;
+    renderApp();
+  }
+}
+
 function bindEvents(){
+  const appEl = document.getElementById("app");
+  appEl.ontouchstart = handleTouchStart;
+  appEl.ontouchend = handleTouchEnd;
+
+  document.querySelectorAll("[data-tab]").forEach(el => el.onclick = () => {
+    libraryTab = el.dataset.tab;
+    renderApp();
+  });
   document.querySelectorAll("[data-nav]").forEach(el => el.onclick = () => {
     screen = el.dataset.nav;
+    activePlaylist = null;
     if(screen === "add"){ addState="idle"; addError=null; selectedFile=null; }
     renderApp();
   });
   document.querySelectorAll("[data-open]").forEach(el => el.onclick = () => {
     activeSong = library.find(s => s.id === el.dataset.open);
+    activePlaylist = null;
     selectedFormats = ["letra"];
     transposeAmount = 0;
     screen = "song";
     renderApp();
   });
-  document.querySelectorAll("[data-del]").forEach(el => el.onclick = (e) => {
+  document.querySelectorAll("[data-del-song]").forEach(el => el.onclick = (e) => {
     e.stopPropagation();
-    songsCollection().doc(el.dataset.del).delete().catch(err => console.error(err));
+    songsCollection().doc(el.dataset.delSong).delete().catch(err => console.error(err));
   });
+  document.querySelectorAll("[data-del-playlist]").forEach(el => el.onclick = (e) => {
+    e.stopPropagation();
+    playlistsCollection().doc(el.dataset.delPlaylist).delete().catch(err => console.error(err));
+  });
+  document.querySelectorAll("[data-create-playlist]").forEach(el => el.onclick = () => {
+    const title = prompt("Digite o nome da nova pasta / playlist de show:");
+    if(!title || !title.trim()) return;
+    
+    if(!library.length) {
+      alert("Adicione músicas à sua biblioteca primeiro!");
+      return;
+    }
+    const selectedIds = library.map(s => s.id);
+    playlistsCollection().add({
+      title: title.trim(),
+      songIds: selectedIds,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  });
+  document.querySelectorAll("[data-start-playlist]").forEach(el => el.onclick = () => {
+    const p = playlists.find(x => x.id === el.dataset.startPlaylist);
+    if(!p || !p.songIds || !p.songIds.length) {
+      alert("Esta playlist não tem músicas.");
+      return;
+    }
+    activePlaylist = p;
+    activePlaylistIndex = 0;
+    activeSong = library.find(s => s.id === p.songIds[0]);
+    selectedFormats = ["grade"];
+    transposeAmount = 0;
+    screen = "song";
+    renderApp();
+  });
+  document.querySelectorAll("[data-playlist-prev]").forEach(el => el.onclick = () => changePlaylistSong(-1));
+  document.querySelectorAll("[data-playlist-next]").forEach(el => el.onclick = () => changePlaylistSong(1));
+
   document.querySelectorAll("[data-formats]").forEach(el => el.onclick = () => {
     selectedFormats = JSON.parse(el.dataset.formats);
     renderApp();
