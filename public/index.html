@@ -326,6 +326,7 @@
     border-radius: 8px;
     font-size: 13px;
     line-height: 1.4;
+    word-break: break-all;
   }
 </style>
 </head>
@@ -361,7 +362,7 @@ let SONG = {
 };
 
 let transposeAmount = 0;
-let deviceMode = "phone";
+let deviceMode = "add"; // Começa direto na tela de adicionar para testar logo
 let selectedFormats = ["letra"];
 let selectedFile = null;
 let errorMessage = "";
@@ -375,7 +376,7 @@ async function comprimirAudioAntesDoEnvio(file) {
 
   const targetSampleRate = 16000;
   const numChannels = 1;
-  const maxDuration = Math.min(audioBuffer.duration, 60);
+  const maxDuration = Math.min(audioBuffer.duration, 45); // Limitado a 45s para evitar timeout na Vercel
   const sampleCount = Math.floor(maxDuration * targetSampleRate);
 
   const offlineCtx = new OfflineAudioContext(numChannels, sampleCount, targetSampleRate);
@@ -580,12 +581,24 @@ async function startProcessing(){
       body: arquivoComprimido
     });
 
+    const responseText = await response.text();
+
     if(!response.ok) {
-      const errJson = await response.json().catch(() => ({}));
-      throw new Error(errJson.error || "Erro no servidor ao processar o áudio.");
+      let errorMsg = `Erro no servidor (Código ${response.status})`;
+      try {
+        const errJson = JSON.parse(responseText);
+        errorMsg = errJson.error || errorMsg;
+      } catch(e) {
+        if (response.status === 504) {
+          errorMsg = "Tempo limite excedido na Vercel (Timeout). O servidor demorou muito a responder.";
+        } else {
+          errorMsg = responseText.slice(0, 150) || errorMsg;
+        }
+      }
+      throw new Error(errorMsg);
     }
 
-    const data = await response.json();
+    const data = JSON.parse(responseText);
     SONG = data;
     
     deviceMode = "phone";
