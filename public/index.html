@@ -81,7 +81,6 @@
     border-color: var(--brass);
   }
 
-  /* ===== Screen chrome ===== */
   .statusbar{
     height: 34px;
     display:flex;
@@ -103,6 +102,22 @@
     text-transform: uppercase;
     color: var(--sage);
     margin-bottom: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .btn-edit{
+    background: var(--bg-raised);
+    color: var(--brass);
+    border: 1px solid var(--brass-dim);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 10px;
+    cursor: pointer;
+  }
+  .btn-edit.editing{
+    background: var(--brass);
+    color: #1B1300;
   }
   .song-header h1{
     font-family: var(--font-display);
@@ -114,6 +129,15 @@
   .song-header .artist{
     color: var(--ink-dim);
     font-size: 13px;
+  }
+
+  .editable{
+    outline: none;
+    border-bottom: 1px dashed transparent;
+  }
+  .is-editing .editable{
+    border-bottom-color: var(--brass);
+    background: rgba(232, 163, 61, 0.08);
   }
 
   .screen-body{
@@ -256,7 +280,6 @@
     border-color: var(--brass);
   }
 
-  /* Tela Adicionar / Enviar Áudio */
   .add-screen{ padding: 26px 20px; }
   .add-screen .eyebrow{
     font-family: var(--font-mono);
@@ -367,6 +390,7 @@ let selectedFormats = ["letra"];
 let selectedFile = null;
 let errorMessage = "";
 let isProcessing = false;
+let isEditingMode = false;
 
 // ================= COMPRESSÃO DE ÁUDIO NO NAVEGADOR =================
 async function comprimirAudioAntesDoEnvio(file) {
@@ -436,24 +460,38 @@ function transposeChord(chord, semitones){
 
 function renderLetra(){
   let html = "";
-  SONG.lyricSections.forEach(sec => {
-    html += `<div class="section-label">${sec.label}</div>`;
-    sec.lines.forEach(l => { html += `<div class="lyric-line">${l}</div>`; });
+  SONG.lyricSections.forEach((sec, sIdx) => {
+    html += `<div class="section-label editable" contenteditable="${isEditingMode}" onblur="updateLyricSectionLabel(${sIdx}, this.innerText)">${sec.label}</div>`;
+    sec.lines.forEach((l, lIdx) => { 
+      html += `<div class="lyric-line editable" contenteditable="${isEditingMode}" onblur="updateLyricLine(${sIdx}, ${lIdx}, this.innerText)">${l}</div>`; 
+    });
   });
   return html;
 }
 
 function renderCifra(){
   let html = "";
-  SONG.chordLines.forEach(line => {
+  SONG.chordLines.forEach((line, lineIdx) => {
     html += `<div class="chord-line">`;
-    line.forEach(chunk => {
+    line.forEach((chunk, chunkIdx) => {
       const shown = transposeChord(chunk.chord, transposeAmount);
-      html += `<span class="chunk"><span class="chord">${shown}</span>${chunk.text || "&nbsp;"}</span>`;
+      html += `<span class="chunk"><span class="chord editable" contenteditable="${isEditingMode}" onblur="updateChord(${lineIdx}, ${chunkIdx}, this.innerText)">${shown}</span><span class="editable" contenteditable="${isEditingMode}" onblur="updateChunkText(${lineIdx}, ${chunkIdx}, this.innerText)">${chunk.text || "&nbsp;"}</span></span>`;
     });
     html += `</div>`;
   });
   return html;
+}
+
+function updateLyricSectionLabel(sIdx, val){ SONG.lyricSections[sIdx].label = val; }
+function updateLyricLine(sIdx, lIdx, val){ SONG.lyricSections[sIdx].lines[lIdx] = val; }
+function updateChord(lineIdx, chunkIdx, val){ SONG.chordLines[lineIdx][chunkIdx].chord = val; }
+function updateChunkText(lineIdx, chunkIdx, val){ SONG.chordLines[lineIdx][chunkIdx].text = val; }
+function updateTitle(val){ SONG.title = val; }
+function updateArtist(val){ SONG.artist = val; }
+
+function toggleEditingMode(){
+  isEditingMode = !isEditingMode;
+  render();
 }
 
 function chunkMeasures(measuresPerSystem){
@@ -657,13 +695,23 @@ function renderPanesHTML(formats, direction){
 function renderPhone(){
   const device = document.getElementById("device");
   device.style.width = "390px";
+  if (isEditingMode) device.classList.add("is-editing");
+  else device.classList.remove("is-editing");
+
   const direction = selectedFormats.length > 1 ? "column" : "row";
   device.innerHTML = `
     <div class="statusbar"><span>9:41</span><span>♪ Harmonia</span></div>
     <div class="song-header">
-      <div class="eyebrow">Cifra sincronizada · IA</div>
-      <h1>${SONG.title}</h1>
-      <div class="artist">${SONG.artist} · Tom: ${transposeChord(SONG.originalKey, transposeAmount)} · ${SONG.bpm} BPM</div>
+      <div class="eyebrow">
+        <span>Cifra sincronizada · IA</span>
+        <button class="btn-edit ${isEditingMode ? 'editing' : ''}" onclick="toggleEditingMode()">
+          ${isEditingMode ? '✓ Salvar' : '✎ Editar'}
+        </button>
+      </div>
+      <h1 class="editable" contenteditable="${isEditingMode}" onblur="updateTitle(this.innerText)">${SONG.title}</h1>
+      <div class="artist">
+        <span class="editable" contenteditable="${isEditingMode}" onblur="updateArtist(this.innerText)">${SONG.artist}</span> · Tom: ${transposeChord(SONG.originalKey, transposeAmount)} · ${SONG.bpm} BPM
+      </div>
       ${formatSelectorHTML()}
     </div>
     <div>${renderPanesHTML(selectedFormats, direction)}</div>
@@ -683,12 +731,22 @@ function renderPhone(){
 function renderTablet(){
   const device = document.getElementById("device");
   device.style.width = "820px";
+  if (isEditingMode) device.classList.add("is-editing");
+  else device.classList.remove("is-editing");
+
   device.innerHTML = `
     <div class="statusbar"><span>9:41</span><span>♪ Harmonia</span></div>
     <div class="song-header">
-      <div class="eyebrow">Modo Estante</div>
-      <h1>${SONG.title}</h1>
-      <div class="artist">${SONG.artist} · Tom: ${transposeChord(SONG.originalKey, transposeAmount)} · ${SONG.bpm} BPM</div>
+      <div class="eyebrow">
+        <span>Modo Estante</span>
+        <button class="btn-edit ${isEditingMode ? 'editing' : ''}" onclick="toggleEditingMode()">
+          ${isEditingMode ? '✓ Salvar' : '✎ Editar'}
+        </button>
+      </div>
+      <h1 class="editable" contenteditable="${isEditingMode}" onblur="updateTitle(this.innerText)">${SONG.title}</h1>
+      <div class="artist">
+        <span class="editable" contenteditable="${isEditingMode}" onblur="updateArtist(this.innerText)">${SONG.artist}</span> · Tom: ${transposeChord(SONG.originalKey, transposeAmount)} · ${SONG.bpm} BPM
+      </div>
       ${formatSelectorHTML()}
     </div>
     <div>${renderPanesHTML(selectedFormats, "row")}</div>
