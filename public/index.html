@@ -18,6 +18,7 @@
     --brass: #E8A33D;
     --brass-dim: #7A5A28;
     --sage: #5FA8A0;
+    --danger: #D9695F;
     --radius: 14px;
     --font-display: 'Space Grotesk', sans-serif;
     --font-body: 'Inter', sans-serif;
@@ -80,6 +81,7 @@
     border-color: var(--brass);
   }
 
+  /* ===== Screen chrome ===== */
   .statusbar{
     height: 34px;
     display:flex;
@@ -253,6 +255,79 @@
     color: #1B1300;
     border-color: var(--brass);
   }
+
+  /* Tela Adicionar / Enviar Áudio */
+  .add-screen{ padding: 26px 20px; }
+  .add-screen .eyebrow{
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--sage);
+    margin-bottom: 6px;
+  }
+  .add-screen h1{
+    font-family: var(--font-display);
+    font-size: 24px;
+    margin: 0 0 6px;
+  }
+  .add-screen p.sub{
+    color: var(--ink-dim);
+    font-size: 13.5px;
+    line-height: 1.5;
+    margin: 0 0 26px;
+  }
+  .file-drop-box{
+    background: var(--bg-raised);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius);
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .file-drop-box span {
+    font-size: 13px;
+    color: var(--ink-dim);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 220px;
+  }
+  .file-drop-box button{
+    background: transparent;
+    border: none;
+    color: var(--brass);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .generate-btn{
+    width:100%;
+    background: var(--brass);
+    color: #1B1300;
+    border: none;
+    border-radius: var(--radius);
+    padding: 15px;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 14.5px;
+    cursor:pointer;
+  }
+  .generate-btn:disabled{ opacity: 0.6; cursor:default; }
+  .error-box{
+    margin-top: 14px;
+    background: rgba(217, 105, 95, 0.15);
+    border: 1px solid var(--danger);
+    color: #ff9e96;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.4;
+    word-break: break-all;
+  }
 </style>
 </head>
 <body>
@@ -260,58 +335,94 @@
   <div class="mode-toggle" id="deviceToggle">
     <button class="active" data-mode="phone">Celular</button>
     <button data-mode="tablet">Tablet</button>
+    <button data-mode="add">+ Nova música</button>
   </div>
   <div class="device" id="device"></div>
 
 <script>
-const SONGS = [
-  {
-    title: "Deixa a Luz Entrar",
-    artist: "Demonstração",
-    originalKey: "G",
-    bpm: 92,
-    lyricSections: [
-      { label: "Verso 1", lines: ["Deixa a luz entrar pela janela", "O dia começa e eu começo nela"] },
-      { label: "Refrão", lines: ["E se o mundo cansa, eu vou de novo"] }
-    ],
-    chordLines: [
-      [ {chord:"G", text:"Deixa a "}, {chord:"Em", text:"luz entrar"} ],
-      [ {chord:"C", text:"E se o mundo "}, {chord:"D", text:"cansa"} ]
-    ],
-    measures: [
-      {chord:"G", section:null, cue:null, doubleBarAfter:false},
-      {chord:"Em", section:null, cue:null, doubleBarAfter:true},
-      {chord:"C", section:"Refrão", cue:null, doubleBarAfter:false},
-      {chord:"D", section:null, cue:null, doubleBarAfter:true}
-    ]
-  },
-  {
-    title: "Caminho de Paz",
-    artist: "Demonstração 2",
-    originalKey: "C",
-    bpm: 80,
-    lyricSections: [
-      { label: "Verso 1", lines: ["Caminhando e cantando e seguindo a canção", "Somos todos iguais, braços dados ou não"] }
-    ],
-    chordLines: [
-      [ {chord:"C", text:"Caminhando e "}, {chord:"Am", text:"cantando"} ],
-      [ {chord:"F", text:"Somos todos "}, {chord:"G", text:"iguais"} ]
-    ],
-    measures: [
-      {chord:"C", section:"Intro", cue:null, doubleBarAfter:false},
-      {chord:"Am", section:null, cue:null, doubleBarAfter:true},
-      {chord:"F", section:"Verso", cue:null, doubleBarAfter:false},
-      {chord:"G", section:null, cue:null, doubleBarAfter:true}
-    ]
-  }
-];
+let SONG = {
+  title: "Deixa a Luz Entrar",
+  artist: "Demonstração",
+  originalKey: "G",
+  bpm: 92,
+  lyricSections: [
+    { label: "Verso 1", lines: ["Deixa a luz entrar pela janela", "O dia começa e eu começo nela"] },
+    { label: "Refrão", lines: ["E se o mundo cansa, eu vou de novo"] }
+  ],
+  chordLines: [
+    [ {chord:"G", text:"Deixa a "}, {chord:"Em", text:"luz entrar"} ],
+    [ {chord:"C", text:"E se o mundo "}, {chord:"D", text:"cansa"} ]
+  ],
+  measures: [
+    {chord:"G", section:null, cue:null, doubleBarAfter:false},
+    {chord:"Em", section:null, cue:null, doubleBarAfter:true},
+    {chord:"C", section:"Refrão", cue:null, doubleBarAfter:false},
+    {chord:"D", section:null, cue:null, doubleBarAfter:true}
+  ]
+};
 
-let currentSongIndex = 0;
-let SONG = SONGS[0];
 let transposeAmount = 0;
 let deviceMode = "phone";
 let selectedFormats = ["letra"];
+let selectedFile = null;
+let errorMessage = "";
+let isProcessing = false;
 
+// ================= COMPRESSÃO DE ÁUDIO NO NAVEGADOR =================
+async function comprimirAudioAntesDoEnvio(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+  const targetSampleRate = 16000;
+  const numChannels = 1;
+  const maxDuration = Math.min(audioBuffer.duration, 45);
+  const sampleCount = Math.floor(maxDuration * targetSampleRate);
+
+  const offlineCtx = new OfflineAudioContext(numChannels, sampleCount, targetSampleRate);
+  const source = offlineCtx.createBufferSource();
+  source.buffer = audioBuffer;
+  source.connect(offlineCtx.destination);
+  source.start(0, 0, maxDuration);
+
+  const renderedBuffer = await offlineCtx.startRendering();
+  const wavBlob = audioBufferToWav(renderedBuffer, targetSampleRate);
+  
+  return new File([wavBlob], file.name.replace(/\.[^/.]+$/, "") + "_comprimido.wav", { type: "audio/wav" });
+}
+
+function audioBufferToWav(buffer, sampleRate) {
+  const numOfChan = buffer.numberOfChannels;
+  const length = buffer.length * numOfChan * 2 + 44;
+  const out = new DataView(new ArrayBuffer(length));
+  let channels = [];
+  let offset = 0;
+  let pos = 0;
+
+  function writeString(str) { for (let i = 0; i < str.length; i++) { out.setUint8(pos++, str.charCodeAt(i)); } }
+  function setUint16(data) { out.setUint16(pos, data, true); pos += 2; }
+  function setUint32(data) { out.setUint32(pos, data, true); pos += 4; }
+
+  writeString('RIFF'); setUint32(length - 8); writeString('WAVE');
+  writeString('fmt '); setUint32(16); setUint16(1); setUint16(numOfChan);
+  setUint32(sampleRate); setUint32(sampleRate * 2 * numOfChan);
+  setUint16(numOfChan * 2); setUint16(16);
+  writeString('data'); setUint32(length - pos - 4);
+
+  for (let i = 0; i < buffer.numberOfChannels; i++) { channels.push(buffer.getChannelData(i)); }
+  while (pos < length) {
+    for (let i = 0; i < numOfChan; i++) {
+      let sample = Math.max(-1, Math.min(1, channels[i][offset]));
+      sample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+      out.setInt16(pos, sample, true);
+      pos += 2;
+    }
+    offset++;
+  }
+  return new Blob([out.buffer], { type: 'audio/wav' });
+}
+
+// ================= RENDERIZADORES =================
 function transposeChord(chord, semitones){
   if(!chord) return chord;
   const CHROMATIC = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
@@ -422,6 +533,89 @@ function fitStaffPages(){
   });
 }
 
+function renderAddScreen(){
+  const device = document.getElementById("device");
+  device.style.width = "390px";
+  device.innerHTML = `
+    <div class="statusbar"><span>9:41</span><span>♪ Harmonia</span></div>
+    <div class="add-screen">
+      <div class="eyebrow">Nova música · IA</div>
+      <h1>Envie o áudio da música</h1>
+      <p class="sub">Selecione o ficheiro de áudio. O app comprime-o automaticamente e a IA gera a letra, cifra e grade rítmica.</p>
+      
+      <input type="file" id="audioFileInput" accept="audio/*" style="display:none" onchange="onFileSelected(event)">
+      <div class="file-drop-box">
+        <span>${selectedFile ? selectedFile.name + " (" + (selectedFile.size/(1024*1024)).toFixed(1) + "MB)" : "Nenhum ficheiro selecionado"}</span>
+        <button onclick="document.getElementById('audioFileInput').click()">Escolher</button>
+      </div>
+
+      <button class="generate-btn" onclick="startProcessing()" ${isProcessing || !selectedFile ? "disabled" : ""}>
+        ${isProcessing ? "A processar áudio..." : "Gerar cifra com IA"}
+      </button>
+
+      ${errorMessage ? `<div class="error-box">${errorMessage}</div>` : ""}
+    </div>
+  `;
+}
+
+function onFileSelected(e){
+  selectedFile = e.target.files[0];
+  errorMessage = "";
+  renderAddScreen();
+}
+
+async function startProcessing(){
+  if(!selectedFile) return;
+  isProcessing = true;
+  errorMessage = "";
+  renderAddScreen();
+
+  try {
+    const arquivoComprimido = await comprimirAudioAntesDoEnvio(selectedFile);
+
+    const response = await fetch("/api/analisar", {
+      method: "POST",
+      headers: {
+        "Content-Type": "audio/wav"
+      },
+      body: arquivoComprimido
+    });
+
+    const responseText = await response.text();
+
+    if(!response.ok) {
+      let errorMsg = `Erro no servidor (Código ${response.status})`;
+      try {
+        const errJson = JSON.parse(responseText);
+        errorMsg = errJson.error || errorMsg;
+      } catch(e) {
+        if (response.status === 504) {
+          errorMsg = "Tempo limite excedido na Vercel (Timeout).";
+        } else {
+          errorMsg = responseText.slice(0, 150) || errorMsg;
+        }
+      }
+      throw new Error(errorMsg);
+    }
+
+    const data = JSON.parse(responseText);
+    SONG = data;
+    
+    deviceMode = "phone";
+    selectedFormats = ["letra"];
+    document.querySelectorAll("#deviceToggle button").forEach(b => {
+      b.classList.toggle("active", b.dataset.mode === "phone");
+    });
+    render();
+
+  } catch (err) {
+    errorMessage = err.message;
+  } finally {
+    isProcessing = false;
+    renderAddScreen();
+  }
+}
+
 const FORMAT_PRESETS = [
   { key:"letra", label:"Letra", formats:["letra"] },
   { key:"cifra", label:"Cifra", formats:["cifra"] },
@@ -446,13 +640,6 @@ function setFormats(formats){
   render();
 }
 
-function switchSong(index){
-  currentSongIndex = index;
-  SONG = SONGS[index];
-  transposeAmount = 0;
-  render();
-}
-
 function renderPanesHTML(formats, direction){
   const isSingle = formats.length === 1;
   let html = `<div style="display:flex; flex-direction:${direction}; width:100%;">`;
@@ -472,14 +659,9 @@ function renderPhone(){
   device.style.width = "390px";
   const direction = selectedFormats.length > 1 ? "column" : "row";
   device.innerHTML = `
-    <div class="statusbar"><span>9:41</span>
-      <div>
-        <button onclick="switchSong(0)" style="background:${currentSongIndex===0?'var(--brass)':'var(--bg-raised)'}; color:${currentSongIndex===0?'#1B1300':'var(--ink)'}; border:1px solid var(--hairline); border-radius:4px; padding:2px 6px; font-size:10px; cursor:pointer;">Música 1</button>
-        <button onclick="switchSong(1)" style="background:${currentSongIndex===1?'var(--brass)':'var(--bg-raised)'}; color:${currentSongIndex===1?'#1B1300':'var(--ink)'}; border:1px solid var(--hairline); border-radius:4px; padding:2px 6px; font-size:10px; cursor:pointer; margin-left:4px;">Música 2</button>
-      </div>
-    <span>♪ Harmonia</span></div>
+    <div class="statusbar"><span>9:41</span><span>♪ Harmonia</span></div>
     <div class="song-header">
-      <div class="eyebrow">Cifra sincronizada · Protótipo</div>
+      <div class="eyebrow">Cifra sincronizada · IA</div>
       <h1>${SONG.title}</h1>
       <div class="artist">${SONG.artist} · Tom: ${transposeChord(SONG.originalKey, transposeAmount)} · ${SONG.bpm} BPM</div>
       ${formatSelectorHTML()}
@@ -502,12 +684,7 @@ function renderTablet(){
   const device = document.getElementById("device");
   device.style.width = "820px";
   device.innerHTML = `
-    <div class="statusbar"><span>9:41</span>
-      <div>
-        <button onclick="switchSong(0)" style="background:${currentSongIndex===0?'var(--brass)':'var(--bg-raised)'}; color:${currentSongIndex===0?'#1B1300':'var(--ink)'}; border:1px solid var(--hairline); border-radius:4px; padding:2px 6px; font-size:10px; cursor:pointer;">Música 1</button>
-        <button onclick="switchSong(1)" style="background:${currentSongIndex===1?'var(--brass)':'var(--bg-raised)'}; color:${currentSongIndex===1?'#1B1300':'var(--ink)'}; border:1px solid var(--hairline); border-radius:4px; padding:2px 6px; font-size:10px; cursor:pointer; margin-left:4px;">Música 2</button>
-      </div>
-    <span>♪ Harmonia</span></div>
+    <div class="statusbar"><span>9:41</span><span>♪ Harmonia</span></div>
     <div class="song-header">
       <div class="eyebrow">Modo Estante</div>
       <h1>${SONG.title}</h1>
@@ -535,7 +712,8 @@ function changeTranspose(delta){
 
 function render(){
   if(deviceMode === "phone") renderPhone();
-  else renderTablet();
+  else if(deviceMode === "tablet") renderTablet();
+  else renderAddScreen();
 }
 
 document.getElementById("deviceToggle").addEventListener("click", (e) => {
